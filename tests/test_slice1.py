@@ -11,7 +11,7 @@ import unittest
 
 from scan_core import ScanConfig, __version__
 from scan_core.cli import main
-from scan_core.errors import ExitCode, UnsupportedSchemaError
+from scan_core.errors import ExitCode
 from scan_core.validate import load_report_state, validate_path, validate_state
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,8 +38,8 @@ class SliceOneTests(unittest.TestCase):
             validated = validate_path(path)
         self.assertEqual(validated["schema_version"], "1.2")
 
-    def test_schema_13_is_reserved_but_not_silently_accepted(self):
-        with self.assertRaisesRegex(UnsupportedSchemaError, "Slice 3"):
+    def test_incomplete_schema_13_is_not_silently_accepted(self):
+        with self.assertRaisesRegex(ValueError, "project"):
             validate_state({"schema_version": "1.3"})
 
     def test_cli_validate_success(self):

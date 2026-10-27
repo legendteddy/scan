@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from datetime import datetime
 from html.parser import HTMLParser
 from pathlib import Path
+import re
 from typing import Any, Mapping
 
 from .errors import UnsupportedSchemaError, ValidationError
@@ -246,8 +248,131 @@ def _validate_state_1_2(state):
     return state
 
 
-SUPPORTED_SCHEMAS = ('1.2',)
-PLANNED_SCHEMAS = ('1.3',)
+SHA256_RE = re.compile(r'^sha256:[0-9a-f]{64}$')
+PATH_KINDS = {'file', 'directory', 'symlink', 'archive_member', 'special', 'unknown'}
+REDACTION_STATES = {'none', 'metadata_only', 'content_redacted', 'path_redacted', 'fully_omitted'}
+PRODUCER_KINDS = {'scan-core', 'external-tool', 'local-model', 'remote-model', 'human'}
+
+
+def _rfc3339(value, label):
+    require(string(value), label + ' must be a timestamp string')
+    try:
+        parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError as error:
+        raise ValidationError(label + ' must be RFC3339-compatible') from error
+    require(parsed.tzinfo is not None, label + ' must include a timezone')
+    return parsed
+
+
+def _sha256(value, label):
+    require(isinstance(value, str) and SHA256_RE.fullmatch(value) is not None,
+            label + ' must be sha256:<64 lowercase hex>')
+
+
+def _validate_state_1_3(state):
+    require(isinstance(state, dict), 'State must be an object')
+    require(state.get('schema_version') == '1.3', 'Expected Scan schema_version 1.3')
+
+    # Reuse the frozen 1.2 structural/reference/coverage semantics without
+    # weakening or silently rewriting any 1.2 report.
+    compatibility = dict(state)
+    compatibility['schema_version'] = '1.2'
+    _validate_state_1_2(compatibility)
+
+    run = state.get('run')
+    require(isinstance(run, dict), 'run must be an object')
+    for key in ('scan_id', 'scan_version', 'started_at', 'completed_at', 'mode',
+                'target_executed', 'network_used'):
+        require(key in run, 'run: missing ' + key)
+    require(string(run['scan_id']) and run['scan_id'].startswith('scan:'),
+            'run.scan_id must be a scan: identifier')
+    require(string(run['scan_version']), 'run.scan_version must be a nonempty string')
+    started_at = _rfc3339(run['started_at'], 'run.started_at')
+    completed_at = _rfc3339(run['completed_at'], 'run.completed_at')
+    require(completed_at >= started_at, 'run.completed_at cannot precede run.started_at')
+    require(run['mode'] == 'static', 'v0.2 core state run.mode must be static')
+    require(run['target_executed'] is False, 'v0.2 core-generated state cannot claim target execution')
+    require(type(run['network_used']) is bool, 'run.network_used must be boolean')
+
+    privacy = state.get('privacy')
+    require(isinstance(privacy, dict), 'privacy must be an object')
+    for key in ('mode', 'redaction_level', 'redaction_count', 'sensitive_path_count',
+                'egress_performed', 'egress_bytes'):
+        require(key in privacy, 'privacy: missing ' + key)
+    require(privacy['mode'] in {'offline', 'local', 'controlled-remote'}, 'Invalid privacy.mode')
+    require(privacy['redaction_level'] in {'none', 'standard', 'strict'}, 'Invalid privacy.redaction_level')
+    for key in ('redaction_count', 'sensitive_path_count', 'egress_bytes'):
+        require(type(privacy[key]) is int and privacy[key] >= 0, 'privacy.' + key + ' must be a non-negative integer')
+    require(privacy['egress_performed'] is False, 'v0.2 core-generated state cannot record performed egress')
+    if privacy['mode'] == 'offline':
+        require(run['network_used'] is False, 'offline privacy mode requires run.network_used=false')
+    require(run['network_used'] is False, 'v0.2 deterministic core must not use network access')
+
+    provenance = state.get('provenance')
+    require(isinstance(provenance, dict), 'provenance must be an object')
+    for key in ('root_identity', 'snapshot_digest', 'state_digest_algorithm',
+                'tool_versions', 'configuration_digest'):
+        require(key in provenance, 'provenance: missing ' + key)
+    require(string(provenance['root_identity']), 'provenance.root_identity must be nonempty')
+    _sha256(provenance['snapshot_digest'], 'provenance.snapshot_digest')
+    _sha256(provenance['configuration_digest'], 'provenance.configuration_digest')
+    require(provenance['state_digest_algorithm'] == 'sha256', 'state_digest_algorithm must be sha256')
+    require(isinstance(provenance['tool_versions'], list), 'provenance.tool_versions must be an array')
+    for index, tool in enumerate(provenance['tool_versions']):
+        label = f'provenance.tool_versions[{index}]'
+        require(isinstance(tool, dict), label + ' must be an object')
+        for key in ('kind', 'name', 'version'):
+            require(string(tool.get(key)), label + '.' + key + ' must be nonempty')
+    require(state['project']['snapshot'].get('identity') == provenance['snapshot_digest'],
+            'project.snapshot identity must equal provenance.snapshot_digest')
+
+    redacted_count = 0
+    unreadable_count = 0
+    for artifact in state['artifacts']:
+        label = artifact['id'] + ': '
+        for key in ('size_bytes', 'media_type', 'path_kind', 'redaction_state'):
+            require(key in artifact, label + 'missing ' + key)
+        require(type(artifact['size_bytes']) is int and artifact['size_bytes'] >= 0,
+                label + 'size_bytes must be a non-negative integer')
+        require(string(artifact['media_type']), label + 'media_type must be nonempty')
+        require(artifact['path_kind'] in PATH_KINDS, label + 'invalid path_kind')
+        require(artifact['redaction_state'] in REDACTION_STATES, label + 'invalid redaction_state')
+        if artifact['redaction_state'] != 'none':
+            redacted_count += 1
+        if artifact['status'] == 'unreadable':
+            unreadable_count += 1
+
+    for evidence in state['evidence']:
+        label = evidence['id'] + ': '
+        require(isinstance(evidence.get('producer'), dict), label + 'producer must be an object')
+        producer = evidence['producer']
+        for key in ('kind', 'name', 'version'):
+            require(string(producer.get(key)), label + 'producer.' + key + ' must be nonempty')
+        require(producer['kind'] in PRODUCER_KINDS, label + 'invalid producer.kind')
+        _sha256(evidence.get('source_digest'), label + 'source_digest')
+
+    coverage = state['coverage']
+    for key in ('resource_limits_hit', 'unreadable_artifact_count', 'redacted_artifact_count'):
+        require(key in coverage, 'coverage: missing ' + key)
+    require(isinstance(coverage['resource_limits_hit'], list) and
+            all(string(v) for v in coverage['resource_limits_hit']),
+            'coverage.resource_limits_hit must be a string array')
+    require(type(coverage['unreadable_artifact_count']) is int and
+            coverage['unreadable_artifact_count'] == unreadable_count,
+            'coverage.unreadable_artifact_count does not match artifacts')
+    require(type(coverage['redacted_artifact_count']) is int and
+            coverage['redacted_artifact_count'] == redacted_count,
+            'coverage.redacted_artifact_count does not match artifacts')
+    require(privacy['redaction_count'] >= redacted_count,
+            'privacy.redaction_count cannot be lower than redacted artifact count')
+    if coverage['resource_limits_hit']:
+        require(coverage['analysis_complete'] is False,
+                'resource limits prevent complete analysis')
+    return state
+
+
+SUPPORTED_SCHEMAS = ('1.2', '1.3')
+PLANNED_SCHEMAS = ()
 
 
 def validate_state(state: Mapping[str, Any], version: str | None = None):
@@ -260,10 +385,9 @@ def validate_state(state: Mapping[str, Any], version: str | None = None):
     if declared == '1.2':
         return _validate_state_1_2(state)
     if declared == '1.3':
-        raise UnsupportedSchemaError(
-            'Scan schema_version 1.3 is reserved by the v0.2 contract but its validator ships in Slice 3')
+        return _validate_state_1_3(state)
     raise UnsupportedSchemaError(
-        f'Unsupported Scan schema_version {declared!r}; supported: 1.2')
+        f'Unsupported Scan schema_version {declared!r}; supported: 1.2, 1.3')
 
 
 def load_report_state(path: str | Path):
