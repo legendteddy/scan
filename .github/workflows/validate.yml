@@ -45,8 +45,16 @@ jobs:
           scan validate "$RUNNER_TEMP/scan-report.html"
           scan render "$RUNNER_TEMP/scan-state.json" --output "$RUNNER_TEMP/scan-rerendered.html"
           scan validate "$RUNNER_TEMP/scan-rerendered.html"
-          scan schema --version 1.3 > "$RUNNER_TEMP/scan-state-1.3.schema.json"
-          python -c "import json,sys; s=json.load(open(sys.argv[1], encoding='utf-8')); assert s['properties']['schema_version']['const']=='1.3'" "$RUNNER_TEMP/scan-state-1.3.schema.json"
+          scan schema --version 1.4 > "$RUNNER_TEMP/scan-state-1.4.schema.json"
+          python -c "import json,sys; s=json.load(open(sys.argv[1], encoding='utf-8')); assert s['properties']['schema_version']['const']=='1.4'" "$RUNNER_TEMP/scan-state-1.4.schema.json"
+          mkdir -p "$RUNNER_TEMP/repeat-project"
+          printf 'one' > "$RUNNER_TEMP/repeat-project/app.txt"
+          (cd "$RUNNER_TEMP/repeat-project" && scan . --offline --quiet)
+          cp "$RUNNER_TEMP/repeat-project/.scan/state.json" "$RUNNER_TEMP/first-state.json"
+          printf 'two' > "$RUNNER_TEMP/repeat-project/app.txt"
+          (cd "$RUNNER_TEMP/repeat-project" && scan . --offline --quiet)
+          scan compare "$RUNNER_TEMP/first-state.json" "$RUNNER_TEMP/repeat-project/.scan/state.json" --json > "$RUNNER_TEMP/compare.json"
+          python -c "import json,sys; s=json.load(open(sys.argv[1], encoding='utf-8')); assert s['snapshot_relation']=='changed'; assert len(s['artifacts']['changed'])==1" "$RUNNER_TEMP/compare.json"
           scan egress scanbench/fixtures/privacy-redaction/target --privacy controlled-remote --redact strict --sensitive-path "private/**" --json
           scan bench
 
@@ -80,4 +88,4 @@ jobs:
         run: |
           python -B -m unittest discover -s tests -p "test_*.py" -q
           scan bench
-          scan schema --version 1.3 > /tmp/scan-schema.json
+          scan schema --version 1.4 > /tmp/scan-schema.json

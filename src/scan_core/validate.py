@@ -506,6 +506,8 @@ def _validate_state_1_4(state):
             'baseline.rejected_reuse_reasons must map strings to non-negative integers')
     require(sum(reasons.values()) == baseline['rejected_reuse_count'],
             'baseline.rejected_reuse_reasons must sum to rejected_reuse_count')
+    require(baseline['fresh_evidence_count'] + baseline['reused_evidence_count'] == len(state['evidence']),
+            'baseline fresh/reused evidence counts must reconcile with evidence collection')
 
     if baseline['status'] == 'used':
         require(baseline['source_schema_version'] in {'1.3', '1.4'},
@@ -615,7 +617,7 @@ def load_report_state(path: str | Path):
 
 def _expected_visible_counts(state):
     coverage = state['coverage']
-    return {
+    expected = {
         'discovered_artifact_count': coverage['discovered_artifact_count'],
         'content_read_count': coverage['counts_by_status'].get('content_read', 0),
         'checks_assessed': coverage['counts_by_check_status'].get('assessed', 0),
@@ -623,6 +625,21 @@ def _expected_visible_counts(state):
         'redaction_count': state['privacy']['redaction_count'],
         'unknown_count': len(state['unknowns']),
     }
+    if state.get('schema_version') == '1.4':
+        delta = state['delta']
+        baseline = state['baseline']
+        expected.update({
+            'delta_artifacts_added': len(delta['artifacts']['added']),
+            'delta_artifacts_changed': len(delta['artifacts']['changed']),
+            'delta_artifacts_removed': len(delta['artifacts']['removed']),
+            'delta_findings_new': len(delta['findings']['new']),
+            'delta_findings_resolved': len(delta['findings']['resolved']),
+            'delta_unknowns_new': len(delta['unknowns']['new']),
+            'delta_unknowns_resolved': len(delta['unknowns']['resolved']),
+            'fresh_evidence_count': baseline['fresh_evidence_count'],
+            'reused_evidence_count': baseline['reused_evidence_count'],
+        })
+    return expected
 
 
 def validate_report(path: str | Path):

@@ -425,6 +425,13 @@ class SemanticStateBuilder:
 
     def build(self, *, analysis_complete: bool | None = None) -> dict[str, Any]:
         coverage = self.state["coverage"]
+        if self.state.get("schema_version") == "1.4":
+            baseline = self.state["baseline"]
+            reused = sum(1 for row in self.state["evidence"] if row.get("inspection_origin") == "verified_reuse")
+            if baseline["status"] != "used" and reused:
+                raise BuilderError("baseline.reused_evidence_count: verified_reuse evidence requires a used baseline")
+            baseline["reused_evidence_count"] = reused
+            baseline["fresh_evidence_count"] = len(self.state["evidence"]) - reused
         coverage["counts_by_status"] = dict(Counter(row["status"] for row in self.state["artifacts"]))
         coverage["counts_by_check_status"] = dict(Counter(row["status"] for row in self.state["checks"]))
         coverage["checks_complete"] = all(row["status"] in {"assessed", "not_applicable"} for row in self.state["checks"])
