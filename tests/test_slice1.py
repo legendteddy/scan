@@ -65,10 +65,20 @@ class SliceOneTests(unittest.TestCase):
             code = main(["bench"])
         self.assertEqual(code, ExitCode.COMMAND_ERROR)
 
-    def test_cli_primary_scan_is_explicitly_not_implemented_yet(self):
-        with contextlib.redirect_stderr(io.StringIO()):
-            code = main([str(ROOT)])
-        self.assertEqual(code, ExitCode.COMMAND_ERROR)
+    def test_cli_primary_scan_remains_available_after_later_slices(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "state.json"
+            report_path = Path(directory) / "report.html"
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = main([
+                    str(ROOT / "scanbench" / "fixtures" / "inventory-basic" / "target"),
+                    "--state", str(state_path),
+                    "--output", str(report_path),
+                    "--quiet",
+                ])
+            self.assertEqual(code, ExitCode.OK)
+            self.assertTrue(state_path.is_file())
+            self.assertTrue(report_path.is_file())
 
 
 if __name__ == "__main__":

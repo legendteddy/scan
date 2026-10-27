@@ -170,10 +170,19 @@ class State13Tests(unittest.TestCase):
             self.assertTrue(output.exists())
             self.assertEqual(validate_path(output)["schema_version"], "1.3")
 
-    def test_cli_default_refuses_fake_html_until_renderer_exists(self):
-        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            code = main([str(FIXTURE)])
-        self.assertEqual(code, ExitCode.COMMAND_ERROR)
+    def test_cli_default_html_path_is_supported_after_renderer_slice(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "state.json"
+            report_path = Path(directory) / "report.html"
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                code = main([
+                    str(FIXTURE),
+                    "--state", str(state_path),
+                    "--output", str(report_path),
+                    "--quiet",
+                ])
+            self.assertEqual(code, ExitCode.OK)
+            self.assertTrue(report_path.is_file())
 
     def test_cli_fail_on_partial_returns_coverage_exit_after_writing_state(self):
         with tempfile.TemporaryDirectory() as directory:

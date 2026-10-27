@@ -6,9 +6,9 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 from .config import ScanConfig, ScanResult
-from .errors import CommandError
 from .inventory import build_inventory
 from .privacy import assess_privacy
+from .render import render_report
 from .snapshot import build_snapshot
 from .state import build_state, canonical_state_json
 from .validate import validate_state
@@ -62,15 +62,7 @@ def _prepare_output_omissions(config: ScanConfig, root: Path) -> tuple[str, ...]
 
 
 def scan_project(config: ScanConfig) -> ScanResult:
-    """Build deterministic inventory, snapshot and canonical Scan 1.3 JSON state.
-
-    The current standalone core does not render HTML. Callers requesting HTML receive
-    a clear command error rather than a placeholder report that could be mistaken for
-    a complete v0.2 output.
-    """
-    if config.output_html is not None:
-        raise CommandError("HTML report rendering is not implemented yet; request state-only output")
-
+    """Build deterministic canonical state and optional self-contained HTML report."""
     started_at = _utc_now()
     root = Path(config.root).resolve(strict=True)
     tool_owned_omissions = _prepare_output_omissions(config, root)
@@ -89,6 +81,7 @@ def scan_project(config: ScanConfig) -> ScanResult:
     validate_state(state, version="1.3")
 
     state_path = _write_state(config.output_state, state) if config.output_state is not None else None
+    report_path = render_report(state, config.output_html) if config.output_html is not None else None
     completion = "partial"
     warnings = tuple(inventory.warnings) + tuple(privacy.warnings) + (
         "Semantic analysis and runtime verification are not established by deterministic state construction",
@@ -96,7 +89,7 @@ def scan_project(config: ScanConfig) -> ScanResult:
     return ScanResult(
         state=state,
         state_path=state_path,
-        report_path=None,
+        report_path=report_path,
         completion=completion,
         warnings=warnings,
     )

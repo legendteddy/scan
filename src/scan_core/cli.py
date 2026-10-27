@@ -12,6 +12,7 @@ from .config import ScanConfig
 from .core import scan_project
 from .inventory import build_inventory
 from .privacy import build_egress_preview
+from .render import render_report
 from .version import __version__
 from .errors import (
     CommandError,
@@ -34,6 +35,7 @@ def _primary_parser() -> argparse.ArgumentParser:
     parser.add_argument("--state", type=Path, default=Path(".scan/state.json"))
     parser.add_argument("--no-html", action="store_true")
     parser.add_argument("--privacy", choices=("offline", "local", "controlled-remote"), default="offline")
+    parser.add_argument("--offline", action="store_true", help="Explicit shorthand for --privacy offline")
     parser.add_argument("--redact", choices=("none", "standard", "strict"), default="standard")
     parser.add_argument("--exclude", action="append", default=[])
     parser.add_argument("--sensitive-path", action="append", default=[])
@@ -78,6 +80,12 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
             raise SourceError(f"Source path does not exist: {args.path}")
         validate_path(args.path)
         return int(ExitCode.OK)
+    if command == "render":
+        if not args.state_json.exists():
+            raise SourceError(f"Source path does not exist: {args.state_json}")
+        state = validate_path(args.state_json)
+        render_report(state, args.output)
+        return int(ExitCode.OK)
     if command == "egress":
         if not args.path.exists():
             raise SourceError(f"Source path does not exist: {args.path}")
@@ -112,14 +120,15 @@ def _run_primary(argv: Sequence[str]) -> int:
     root = Path(args.path)
     if not root.exists():
         raise SourceError(f"Source path does not exist: {root}")
-    if not args.no_html:
-        raise CommandError("HTML rendering is not implemented yet; use --no-html for canonical Scan 1.3 state output")
+
+    if args.offline and args.privacy != "offline":
+        raise CommandError("--offline cannot be combined with a non-offline --privacy mode")
 
     config = ScanConfig(
         root=root,
         output_state=args.state,
-        output_html=None,
-        privacy_mode=args.privacy,
+        output_html=None if args.no_html else args.output,
+        privacy_mode="offline" if args.offline else args.privacy,
         redaction_level=args.redact,
         excludes=tuple(args.exclude),
         sensitive_paths=tuple(args.sensitive_path),
@@ -135,11 +144,14 @@ def _run_primary(argv: Sequence[str]) -> int:
         "artifact_count": result.state["coverage"]["discovered_artifact_count"],
         "completion": result.completion,
         "state_path": str(result.state_path) if result.state_path is not None else None,
+        "report_path": str(result.report_path) if result.report_path is not None else None,
     }
     if args.json:
         print(json.dumps(summary, sort_keys=True, separators=(",", ":")))
     elif not args.quiet:
         print(f"Scan state {summary['schema_version']} written to {summary['state_path']}")
+        if summary["report_path"] is not None:
+            print(f"Report written to {summary['report_path']}")
         print(f"Snapshot: {summary['snapshot_digest']}")
         print(f"Artifacts: {summary['artifact_count']} | completion: {summary['completion']}")
     if args.fail_on == "PARTIAL" and result.completion != "complete":
