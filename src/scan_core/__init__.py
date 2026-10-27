@@ -8,6 +8,7 @@ Slice 5 renders validated self-contained HTML directly from canonical state.
 Slice 6 adds ScanBench v1, bundled schemas, project config and release hardening.
 """
 
+from .compare import Comparison, compare_states
 from .config import ScanConfig, ScanResult
 from .core import scan_project
 from .inventory import InventoryArtifact, InventoryResult, build_inventory
@@ -26,12 +27,13 @@ from .scanbench import BenchResult, run_bench
 from .schema import schema_object, schema_text
 from .settings import ProjectSettings, load_project_settings
 from .snapshot import Snapshot, build_snapshot, canonical_manifest
-from .state import build_state, canonical_state_json, configuration_digest
+from .state import build_state, canonical_state_json, configuration_digest, state_digest
 from .validate import validate_path, validate_report, validate_state
 from .version import __version__
 
 __all__ = [
     "BenchResult",
+    "Comparison",
     "EgressPreview",
     "InventoryArtifact",
     "InventoryResult",
@@ -49,6 +51,7 @@ __all__ = [
     "build_state",
     "canonical_manifest",
     "canonical_state_json",
+    "compare_states",
     "configuration_digest",
     "load_project_settings",
     "prepare_text_for_egress",
@@ -59,6 +62,7 @@ __all__ = [
     "scan_project",
     "schema_object",
     "schema_text",
+    "state_digest",
     "validate_path",
     "validate_report",
     "validate_state",
