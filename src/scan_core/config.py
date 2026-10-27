@@ -9,8 +9,49 @@ from typing import Any, Literal
 
 PrivacyMode = Literal["offline", "local", "controlled-remote"]
 RedactionLevel = Literal["none", "standard", "strict"]
+ScanMode = Literal["quick", "deep", "forensic"]
 BaselineMode = Literal["auto", "none", "explicit"]
 Completion = Literal["complete", "partial", "blocked"]
+
+
+_MODE_EXCLUDES: dict[str, tuple[str, ...]] = {
+    # Quick mode preserves first-party signal while suppressing common dependency,
+    # build/cache and repository-internal trees from ordinary content inspection.
+    "quick": (
+        ".git/**",
+        "node_modules/**",
+        ".venv/**",
+        "venv/**",
+        "__pycache__/**",
+        "dist/**",
+        "build/**",
+    ),
+    # Deep remains the whole-project first-party mode. Git object storage is
+    # provenance, not normal project source, and is represented separately.
+    "deep": (".git/**",),
+    # Forensic deliberately opts back into repository internals/history.
+    "forensic": (),
+}
+
+_MODE_CONTRACTS = {
+    "quick": "Triage mode: inventory the project while bounding ordinary content inspection around first-party, high-value paths; dependency/build/cache and Git internals are explicitly suppressed.",
+    "deep": "Whole-project mode: inspect safely readable project content broadly; Git internal storage is excluded from ordinary artifact analysis and represented as repository provenance.",
+    "forensic": "Provenance-heavy mode: include normally suppressed Git internals and other in-scope artifacts unless the user explicitly excludes them.",
+}
+
+
+def mode_excludes(mode: ScanMode | str) -> tuple[str, ...]:
+    try:
+        return _MODE_EXCLUDES[mode]
+    except KeyError as error:
+        raise ValueError(f"Unsupported scan mode: {mode}") from error
+
+
+def mode_contract(mode: ScanMode | str) -> str:
+    try:
+        return _MODE_CONTRACTS[mode]
+    except KeyError as error:
+        raise ValueError(f"Unsupported scan mode: {mode}") from error
 
 
 @dataclass(frozen=True)
@@ -20,6 +61,7 @@ class ScanConfig:
     output_html: Path | None = None
     privacy_mode: PrivacyMode = "offline"
     redaction_level: RedactionLevel = "standard"
+    scan_mode: ScanMode = "deep"
     excludes: tuple[str, ...] = ()
     sensitive_paths: tuple[str, ...] = ()
     max_file_bytes: int = 5_000_000
@@ -36,6 +78,8 @@ class ScanConfig:
             object.__setattr__(self, "output_state", Path(self.output_state))
         if self.output_html is not None:
             object.__setattr__(self, "output_html", Path(self.output_html))
+        if self.scan_mode not in _MODE_EXCLUDES:
+            raise ValueError(f"Unsupported scan mode: {self.scan_mode}")
         if self.baseline_path is not None:
             object.__setattr__(self, "baseline_path", Path(self.baseline_path))
 

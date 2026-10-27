@@ -76,21 +76,69 @@ def _empty_card(title: str, text: str) -> str:
     )
 
 
+_SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational": 4}
+
+
+def _sorted_findings(state: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    return sorted(
+        state["findings"],
+        key=lambda row: (_SEVERITY_ORDER.get(row.get("severity", "informational"), 99), row.get("id", "")),
+    )
+
+
 def _finding_cards(state: Mapping[str, Any]) -> str:
-    rows = state["findings"]
+    rows = _sorted_findings(state)
     if not rows:
         return _empty_card(
             "No findings in deterministic core state",
             "Inventory, hashing and privacy checks do not create semantic findings by themselves.",
         )
-    return "".join(
-        '<article class="finding risk"><div class="finding-top">'
+    cards = "".join(
+        f'<article class="finding severity-{_h(row["severity"])}" data-priority-finding="true"><div class="finding-top">'
         f'<span class="severity">{_h(row["severity"])} · {_h(row["verification_state"])}</span>'
         f'<span class="confidence">{_h(row["confidence"])} confidence</span></div>'
         f'<h3>{_h(row["title"])}</h3><p>{_h(row["impact"])} '
         f'<strong>Limit:</strong> {_h(row["uncertainty"])}</p>'
         f'<span class="evidence-ref">Evidence: {_evidence_links(state, row["evidence_ids"])}</span></article>'
-        for row in rows
+        for row in rows[:5]
+    )
+    if len(rows) > 5:
+        cards += _empty_card(
+            f"{len(rows) - 5} additional finding(s)",
+            "The complete finding set remains searchable in the supporting-detail appendix and embedded state.",
+        )
+    return cards
+
+
+def _what_changed_cards(state: Mapping[str, Any]) -> str:
+    findings = _sorted_findings(state)[:3]
+    if not findings:
+        return (
+            '<article class="insight"><span>Point-in-time review</span>'
+            '<h3>No semantic change claim</h3><p>No prior comparison baseline is embedded, and the current state records no semantic findings that changed the review.</p></article>'
+        )
+    return "".join(
+        '<article class="insight"><span>Review-changing evidence</span>'
+        f'<h3>{_h(row["title"])}</h3><p>{_h(row["impact"])}</p></article>'
+        for row in findings
+    )
+
+
+def _decision_summary(state: Mapping[str, Any]) -> str:
+    findings = _sorted_findings(state)[:3]
+    if findings:
+        return "".join(
+            '<article class="hero-decision">'
+            f'<span>{_h(row["severity"])} finding</span><strong>{_h(row["title"])}</strong>'
+            f'<small>{_h(row["impact"])}</small></article>'
+            for row in findings
+        )
+    priorities = list(state["summary"].get("priorities", []))[:3]
+    if not priorities:
+        priorities = [state["summary"]["condition"]]
+    return "".join(
+        '<article class="hero-decision"><span>Decision</span>'
+        f'<strong>{_h(value)}</strong></article>' for value in priorities
     )
 
 
@@ -248,6 +296,17 @@ def _check_matrix(state: Mapping[str, Any]) -> str:
 
 
 def _appendix(state: Mapping[str, Any]) -> str:
+    finding_rows = [
+        [
+            f'<code>{_h(row["id"])}</code>',
+            _h(row["title"]),
+            _h(row["severity"]),
+            _h(row["verification_state"]),
+            _h(row["recommendation"]),
+            _evidence_links(state, row["evidence_ids"]),
+        ]
+        for row in _sorted_findings(state)
+    ]
     inventory_rows = [
         [
             f'<code>{_h(row["id"])}</code>',
@@ -270,8 +329,17 @@ def _appendix(state: Mapping[str, Any]) -> str:
         ]
         for row in state["evidence"]
     ]
+    findings_html = ""
+    if finding_rows:
+        findings_html = "<h3>All findings</h3>" + _scroll_table(
+            "All findings; scroll horizontally if needed",
+            ["ID", "Finding", "Severity", "Verification", "Recommendation", "Evidence"],
+            finding_rows,
+            "table-findings",
+        )
     return (
-        "<h3>Artifact inventory</h3>"
+        findings_html
+        + "<h3>Artifact inventory</h3>"
         + _scroll_table(
             "Artifact inventory; scroll horizontally if needed",
             ["ID", "Locator", "Kind", "Inspection status", "Identity", "Privacy", "Evidence"],
@@ -321,7 +389,31 @@ def render_html(state: Mapping[str, Any]) -> str:
         f'<p>{_h(limitations)}</p></div></div>'
     )
 
-    target_specific = _baseline_section(validated) + (
+    mode_state = validated.get("extensions", {}).get("scan_mode", {})
+    scan_mode = validated["run"].get("scan_mode", mode_state.get("name", "deep"))
+    mode_contract = mode_state.get("coverage_contract", "Scan mode coverage contract was not recorded.")
+    git_state = validated["provenance"].get("git", {})
+    git_detected = bool(git_state.get("detected"))
+    git_identity = "Not a Git repository"
+    git_detail = "No repository metadata was detected in the declared root."
+    if git_detected:
+        branch = git_state.get("branch") or "detached/unknown"
+        commit = git_state.get("commit") or "commit not resolved"
+        git_identity = f"{branch} · {commit}"
+        limitations_text = "; ".join(git_state.get("limitations", [])) or "No additional Git provenance limits recorded."
+        git_detail = limitations_text
+
+    mode_section = (
+        '<section class="section" aria-labelledby="mode-title">'
+        '<div class="section-head"><div class="section-kicker">Inspection boundary</div>'
+        f'<h2 id="mode-title">{_h(scan_mode)} mode</h2>'
+        f'<p class="section-intro">{_h(mode_contract)}</p></div>'
+        '<div class="insights"><article class="insight"><span>Mode contract</span>'
+        f'<h3>{_h(scan_mode)}</h3><p>{_h(coverage["sampling"])}</p></article>'
+        '<article class="insight"><span>Repository provenance</span>'
+        f'<h3>{_h(git_identity)}</h3><p>{_h(git_detail)}</p></article></div></section>'
+    )
+    target_specific = _baseline_section(validated) + mode_section + (
         '<section class="section" aria-labelledby="privacy-title">'
         '<div class="section-head"><div class="section-kicker">Privacy boundary</div>'
         '<h2 id="privacy-title">Local-first by construction</h2>'
@@ -341,10 +433,12 @@ def render_html(state: Mapping[str, Any]) -> str:
         "PROJECT_NAME": _h(validated["project"]["name"]),
         "PLAIN_LANGUAGE_PURPOSE": _h(validated["summary"]["overview"]),
         "VERDICT_PILLS_HTML": (
+            f'<span class="verdict-pill"><strong>Mode</strong> {_h(scan_mode)}</span>'
             f'<span class="verdict-pill"><strong>Readiness</strong> {_h(validated["summary"]["readiness"])}</span>'
             f'<span class="verdict-pill"><strong>Discovery</strong> {_h(str(coverage["discovery_complete"]).lower())}</span>'
             f'<span class="verdict-pill"><strong>Checks</strong> {_h(str(coverage["checks_complete"]).lower())}</span>'
         ),
+        "DECISION_SUMMARY_HTML": _decision_summary(validated),
         "SNAPSHOT_HTML": (
             f'Run <code>{_h(validated["run"]["scan_id"])}</code><br>'
             f'Snapshot <code>{_h(snapshot)}</code>'
@@ -354,6 +448,9 @@ def render_html(state: Mapping[str, Any]) -> str:
         "VERDICT_SCOPE_AND_LIMITS": _h(validated["summary"]["limitations"]),
         "COVERAGE_STATUS_BANNER_HTML": status_banner,
         "PRIORITY_FINDING_CARDS_HTML": _finding_cards(validated),
+        "WHAT_CHANGED_TITLE": "What changed the review",
+        "WHAT_CHANGED_INTRO": "This is a point-in-time review unless a comparison baseline is embedded. These are the observations that most changed the reviewer’s understanding; they are not claims that the project itself changed over time.",
+        "WHAT_CHANGED_CARDS_HTML": _what_changed_cards(validated),
         "ANATOMY_TITLE": "Architecture requires evidence",
         "ANATOMY_EXPLANATION": "Components and relationships are rendered only when canonical state records them.",
         "EVIDENCED_SYSTEM_MAP_HTML": _system_map(validated),

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from .config import ScanConfig
+from .config import ScanConfig, mode_excludes
 from .errors import SourceError
 from .ids import artifact_id, normalize_locator, sha256_bytes
 
@@ -45,6 +45,7 @@ class InventoryResult:
     resource_limits_hit: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
     tool_owned_omissions: tuple[str, ...] = ()
+    mode_omissions: tuple[str, ...] = ()
 
     @property
     def complete(self) -> bool:
@@ -124,6 +125,7 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
     total_hashed = 0
     artifact_ids: set[str] = set()
     followed_directories: set[Path] = {root}
+    mode_patterns = mode_excludes(config.scan_mode)
 
     def add_artifact(artifact: InventoryArtifact) -> None:
         if artifact.id in artifact_ids:
@@ -151,7 +153,14 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
 
             if _is_excluded(locator, _internal_ignores):
                 continue
-            excluded = _is_excluded(locator, config.excludes)
+            mode_excluded = _is_excluded(locator, mode_patterns)
+            configured_excluded = _is_excluded(locator, config.excludes)
+            excluded = mode_excluded or configured_excluded
+            exclusion_reason = (
+                f"excluded by {config.scan_mode} scan mode policy"
+                if mode_excluded
+                else "excluded by configuration"
+            )
             try:
                 metadata = path.lstat()
             except OSError as error:
@@ -182,7 +191,7 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
                     id=artifact_id(locator), locator=locator, display_name=entry.name,
                     path_kind="symlink", size_bytes=0, content_identity=identity,
                     symlink_target=raw_target, symlink_scope=scope, excluded=excluded,
-                    reason="excluded by configuration" if excluded else "",
+                    reason=exclusion_reason if excluded else "",
                 ))
                 if excluded or not config.follow_internal_links or scope != "internal" or resolved is None:
                     continue
@@ -196,7 +205,7 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
                     id=artifact_id(locator), locator=locator, display_name=entry.name,
                     path_kind="directory", size_bytes=0,
                     content_identity="directory", excluded=excluded,
-                    reason="excluded by configuration" if excluded else "",
+                    reason=exclusion_reason if excluded else "",
                 ))
                 if not excluded:
                     walk(path)
@@ -208,7 +217,7 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
                     path_kind="file" if stat.S_ISREG(mode) else "special",
                     size_bytes=metadata.st_size if stat.S_ISREG(mode) else 0,
                     content_identity="excluded:by-pattern", excluded=True,
-                    reason="excluded by configuration",
+                    reason=exclusion_reason,
                 ))
                 continue
 
@@ -291,4 +300,5 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
         resource_limits_hit=tuple(sorted(limits)),
         warnings=tuple(warnings),
         tool_owned_omissions=tuple(sorted(set(_internal_ignores))),
+        mode_omissions=tuple(mode_patterns),
     )

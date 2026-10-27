@@ -6,7 +6,7 @@
   "required": ["schema_version", "run", "privacy", "provenance", "project", "summary", "coverage", "continuation", "extensions", "checks", "artifacts", "components", "relationships", "evidence", "findings", "controls", "unknowns", "actions", "baseline", "delta"],
   "properties": {
     "schema_version": {"const": "1.4"},
-    "run": {"type": "object", "required": ["scan_id", "scan_version", "started_at", "completed_at", "mode", "target_executed", "network_used"]},
+    "run": {"type": "object", "required": ["scan_id", "scan_version", "started_at", "completed_at", "mode", "target_executed", "network_used"], "properties": {"scan_mode": {"enum": ["quick", "deep", "forensic"]}}},
     "privacy": {"type": "object", "required": ["mode", "redaction_level", "redaction_count", "sensitive_path_count", "egress_performed", "egress_bytes"]},
     "provenance": {"type": "object", "required": ["root_identity", "snapshot_digest", "state_digest_algorithm", "tool_versions", "configuration_digest"]},
     "project": {"type": "object"},
