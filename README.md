@@ -91,19 +91,22 @@ Optional visual QA and screenshot refresh: \`python scripts/capture_preview.py\`
 
 \`\`\`text
 SKILL.md                         Agent instructions and safety boundaries
+pyproject.toml                   Scan Core package metadata and `scan` entry point
+src/scan_core/                   v0.2 deterministic core package (Slice 1 foundation)
+tests/                           Packaged CLI/contract regression tests
 agents/openai.yaml               Skill metadata
 assets/report-shell.html         Self-contained HTML dashboard template
 assets/report-components.html    Report component patterns
 assets/demo-preview.png          Screenshot of the synthetic worked report
 assets/social-preview.png        Upload-ready GitHub social image (1280 × 640)
 references/                      Inspection lenses, coverage and schema contracts
-scripts/validate_report.py       Standard-library report validator
-scripts/test_validate_report.py  Validator regression tests
+scripts/validate_report.py       Backward-compatible Scan 1.2 validator wrapper
+scripts/test_validate_report.py  Frozen 1.2 validator regression tests
 scripts/build_demo_report.py     Reproducible synthetic example generator
 examples/demo-project/           Fictional five-file project
 examples/demo-report.html        Validated, self-contained Scan 1.2 example
 launch/launch-kit.md             Draft launch copy and approval checklist
-docs/v0.2-technical-spec.md      Proposed standalone Scan Core + CLI contract
+docs/v0.2-technical-spec.md      Approved standalone Scan Core + CLI contract
 \`\`\`
 
 ## Contribute and report security issues
