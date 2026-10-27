@@ -71,6 +71,7 @@ class ScanConfig:
     baseline_path: Path | None = None
     reuse_enabled: bool = True
     max_baseline_state_bytes: int = 64_000_000
+    changed_since: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "root", Path(self.root))
@@ -82,6 +83,11 @@ class ScanConfig:
             raise ValueError(f"Unsupported scan mode: {self.scan_mode}")
         if self.baseline_path is not None:
             object.__setattr__(self, "baseline_path", Path(self.baseline_path))
+        if self.changed_since is not None:
+            value = self.changed_since.strip()
+            if not value:
+                raise ValueError("changed_since must be a nonempty local Git ref")
+            object.__setattr__(self, "changed_since", value)
 
 
 @dataclass(frozen=True)

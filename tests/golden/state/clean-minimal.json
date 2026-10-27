@@ -377,7 +377,7 @@
       "producer": {
         "kind": "scan-core",
         "name": "scan-core",
-        "version": "0.3.0.dev3"
+        "version": "0.3.0.dev4"
       },
       "result": "{\"content_identity\":\"sha256:1a3eebf3701bf2aa4d26a487bb1fa80a41cb0884a78658930e46dd5d1a051b74\",\"excluded\":false,\"path_kind\":\"file\",\"size_bytes\":16,\"symlink_scope\":null}",
       "source_digest": "sha256:1a3eebf3701bf2aa4d26a487bb1fa80a41cb0884a78658930e46dd5d1a051b74",
@@ -435,7 +435,7 @@
     ]
   },
   "provenance": {
-    "configuration_digest": "sha256:4bf3b334ec130331a6114cdb932e144195a2ec4f37fd06b984fae4c574384ee8",
+    "configuration_digest": "sha256:ffb4f270fe65ff9679a02757e7f9504c1a10e141ab46d700358fbeea2cf50f43",
     "git": {
       "branch": null,
       "commit": null,
@@ -452,7 +452,7 @@
       {
         "kind": "scan-core",
         "name": "scan-core",
-        "version": "0.3.0.dev3"
+        "version": "0.3.0.dev4"
       }
     ]
   },
@@ -463,7 +463,7 @@
     "network_used": false,
     "scan_id": "<volatile-run-id>",
     "scan_mode": "deep",
-    "scan_version": "0.3.0.dev3",
+    "scan_version": "0.3.0.dev4",
     "started_at": "<volatile-time>",
     "target_executed": false
   },

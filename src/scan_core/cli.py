@@ -55,6 +55,7 @@ def _primary_parser() -> argparse.ArgumentParser:
     _add_scan_options(parser, include_offline=True)
     parser.add_argument("--baseline", default=None, help="auto | none | PATH")
     parser.add_argument("--no-reuse", action="store_true", help="Compare baseline but do not reuse prior evidence")
+    parser.add_argument("--changed-since", default=None, metavar="REF", help="Add local Git change context relative to REF")
     parser.add_argument("--fail-on", choices=("PARTIAL", "ERROR"))
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--quiet", action="store_true")
@@ -147,6 +148,7 @@ def _resolved_config(
         baseline_path=baseline_path,
         reuse_enabled=reuse_enabled,
         max_baseline_state_bytes=settings.max_baseline_state_bytes,
+        changed_since=getattr(args, "changed_since", None),
     )
 
 
@@ -247,6 +249,7 @@ def _run_primary(argv: Sequence[str]) -> int:
         },
         "delta_available": delta["available"],
         "delta": delta,
+        "git_change_scope": result.state.get("extensions", {}).get("git_change_scope"),
         "state_path": str(result.state_path) if result.state_path is not None else None,
         "report_path": str(result.report_path) if result.report_path is not None else None,
     }
@@ -264,6 +267,14 @@ def _run_primary(argv: Sequence[str]) -> int:
             f"Evidence: {freshness['fresh']} fresh | {freshness['reused']} reused | "
             f"{freshness['rejected_reuse']} reuse rejected"
         )
+        git_scope = summary["git_change_scope"]
+        if isinstance(git_scope, dict):
+            print(
+                f"Git change scope {git_scope['base_ref']}..{git_scope['head_ref']}: "
+                f"+{len(git_scope['added'])} ~{len(git_scope['modified'])} "
+                f"-{len(git_scope['deleted'])} R{len(git_scope['renamed'])} "
+                f"C{len(git_scope['copied'])} ?{len(git_scope['untracked'])} (advisory)"
+            )
         if delta["available"]:
             artifacts = delta["artifacts"]
             findings = delta["findings"]

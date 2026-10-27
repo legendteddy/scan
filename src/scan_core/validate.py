@@ -628,6 +628,44 @@ def _validate_state_1_4(state):
             require(all(not delta[collection][key] for key in ('new', 'resolved', 'persisting', 'modified')),
                     'unavailable delta must have empty ' + collection + ' categories')
 
+    git_scope = state.get('extensions', {}).get('git_change_scope')
+    if git_scope is not None:
+        require(isinstance(git_scope, dict), 'extensions.git_change_scope must be an object')
+        for key in ('base_ref', 'head_ref', 'git_version'):
+            require(string(git_scope.get(key)), 'extensions.git_change_scope.' + key + ' must be nonempty')
+        for key in ('added', 'modified', 'deleted', 'untracked'):
+            values = git_scope.get(key)
+            require(isinstance(values, list) and all(string(v) for v in values),
+                    'extensions.git_change_scope.' + key + ' must be a string array')
+            require(len(values) == len(set(values)),
+                    'extensions.git_change_scope.' + key + ' must not contain duplicates')
+        for key in ('renamed', 'copied'):
+            values = git_scope.get(key)
+            require(isinstance(values, list), 'extensions.git_change_scope.' + key + ' must be an array')
+            pairs = []
+            for index, row in enumerate(values):
+                label = f'extensions.git_change_scope.{key}[{index}]'
+                require(isinstance(row, dict), label + ' must be an object')
+                require(string(row.get('from')), label + '.from must be nonempty')
+                require(string(row.get('to')), label + '.to must be nonempty')
+                require(row.get('similarity') is None or string(row.get('similarity')),
+                        label + '.similarity must be null or nonempty')
+                pairs.append((row['from'], row['to']))
+            require(len(pairs) == len(set(pairs)),
+                    'extensions.git_change_scope.' + key + ' must not contain duplicate path pairs')
+        limitations = git_scope.get('limitations')
+        require(isinstance(limitations, list) and all(string(v) for v in limitations),
+                'extensions.git_change_scope.limitations must be a string array')
+        require(state['run']['network_used'] is False,
+                'Git change scope cannot claim or require network use')
+        git_tools = [
+            tool for tool in state['provenance']['tool_versions']
+            if tool.get('kind') == 'external-tool' and tool.get('name') == 'git'
+        ]
+        require(len(git_tools) == 1, 'Git change scope requires exactly one Git tool provenance record')
+        require(git_tools[0].get('version') == git_scope['git_version'],
+                'Git change scope version must match Git tool provenance')
+
     return state
 
 

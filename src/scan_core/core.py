@@ -10,6 +10,7 @@ from typing import Any, Mapping
 from .baseline import BaselineResolution, resolve_baseline
 from .compare import Comparison, compare_states
 from .config import ScanConfig, ScanResult
+from .git_change import inspect_git_change_scope
 from .git_provenance import inspect_git_provenance
 from .inventory import build_inventory
 from .privacy import assess_privacy
@@ -198,6 +199,11 @@ def scan_project(config: ScanConfig) -> ScanResult:
 
     tool_owned_omissions = _prepare_output_omissions(config, root)
     git_provenance = inspect_git_provenance(root)
+    git_change_scope = (
+        inspect_git_change_scope(root, config.changed_since, sensitive_patterns=config.sensitive_paths)
+        if config.changed_since is not None
+        else None
+    )
     inventory = build_inventory(config, _internal_ignores=tool_owned_omissions)
     snapshot = build_snapshot(inventory)
     privacy = assess_privacy(config, inventory)
@@ -210,6 +216,7 @@ def scan_project(config: ScanConfig) -> ScanResult:
         snapshot,
         privacy=privacy,
         git_provenance=git_provenance,
+        git_change_scope=git_change_scope,
         started_at=started_at,
         completed_at=completed_at,
         baseline_status=temporary_status,
