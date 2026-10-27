@@ -15,16 +15,21 @@ Changes should preserve Scan's core guarantees: evidence-backed conclusions, exp
 5. Avoid introducing runtime dependencies unless they materially improve the project and the trade-off is documented.
 6. Do not include private project data, credentials, or generated reports containing sensitive information.
 
-Run the test suite:
+Run the compatibility, core and benchmark gates:
 
 ```bash
 python -m unittest discover -s scripts -p "test_*.py" -v
+python -m unittest discover -s tests -p "test_*.py" -v
+python -m unittest discover -s examples/demo-project/tests -p "test_*.py" -v
+scan bench
 ```
 
-For validator changes, also compile the Python sources:
+For core or validator changes, also compile the Python sources and verify the synthetic report remains reproducible:
 
 ```bash
-python -m py_compile scripts/validate_report.py scripts/test_validate_report.py
+python -m compileall -q src/scan_core tests
+python -m py_compile scripts/validate_report.py scripts/test_validate_report.py scripts/build_demo_report.py
+python scripts/build_demo_report.py --check
 ```
 
 ## Pull requests

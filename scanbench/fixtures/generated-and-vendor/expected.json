@@ -1,0 +1,24 @@
+{
+  "assertions": [
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": "src/main.js"
+    },
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": "vendor/lib.js"
+    },
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": "dist/app.js"
+    },
+    {
+      "dimension": "evidence_correctness",
+      "type": "no_analyzed_artifacts",
+      "value": true
+    }
+  ]
+}

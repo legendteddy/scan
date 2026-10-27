@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scan-skill"
-version = "0.2.0.dev5"
+version = "0.2.0.dev6"
 description = "Evidence-backed whole-project inspection core and agent skill"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,10 +24,19 @@ classifiers = [
 scan = "scan_core.cli:main"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
+package-dir = {"" = "src", "scanbench_data" = "scanbench"}
+packages = ["scan_core", "scan_core.report", "scan_core.schemas", "scanbench_data"]
 
 [tool.setuptools.package-data]
 "scan_core.report" = ["*.html"]
+"scan_core.schemas" = ["*.json"]
+"scanbench_data" = [
+  "manifest.json",
+  "README.md",
+  "fixtures/*/fixture.json",
+  "fixtures/*/expected.json",
+  "fixtures/*/README.md",
+  "fixtures/*/project/*",
+  "fixtures/*/project/.*",
+  "fixtures/*/project/*/*",
+]

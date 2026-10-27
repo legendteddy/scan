@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import fnmatch
 from pathlib import Path
 import re
-from typing import Iterable, Literal
+from typing import Any, Iterable, Literal, Mapping
 
 from .config import RedactionLevel, ScanConfig
 from .inventory import InventoryArtifact, InventoryResult
@@ -292,15 +292,56 @@ def assess_privacy(config: ScanConfig, inventory: InventoryResult) -> PrivacyAss
     )
 
 
-def build_egress_preview(config: ScanConfig, inventory: InventoryResult) -> EgressPreview:
-    assessment = assess_privacy(config, inventory)
+def build_egress_preview(
+    source: Mapping[str, Any] | ScanConfig,
+    inventory: InventoryResult | None = None,
+) -> EgressPreview:
+    """Return deterministic egress metadata without transmitting data.
+
+    The public v0.2 API accepts canonical Scan state. Internal callers may also pass
+    ``(ScanConfig, InventoryResult)`` while constructing that state or serving the
+    CLI preview command.
+    """
+    if isinstance(source, ScanConfig):
+        if inventory is None:
+            raise TypeError("InventoryResult is required when build_egress_preview receives ScanConfig")
+        assessment = assess_privacy(source, inventory)
+        return EgressPreview(
+            files_selected=assessment.files_selected,
+            bytes_selected=assessment.bytes_selected,
+            files_omitted_by_policy=assessment.files_omitted_by_policy,
+            redaction_count=assessment.redaction_count,
+            sensitive_paths_omitted=assessment.sensitive_paths_omitted,
+            privacy_mode=source.privacy_mode,
+            network_action="none",
+        )
+
+    privacy = source.get("privacy")
+    extensions = source.get("extensions")
+    if not isinstance(privacy, Mapping) or not isinstance(extensions, Mapping):
+        raise ValueError("Canonical Scan state must contain privacy and extensions objects")
+    preview = extensions.get("privacy_egress_preview")
+    if not isinstance(preview, Mapping):
+        raise ValueError("Canonical Scan state is missing extensions.privacy_egress_preview")
+    required = ("files_selected", "bytes_selected", "files_omitted_by_policy", "sensitive_paths_omitted")
+    for key in required:
+        if type(preview.get(key)) is not int or preview[key] < 0:
+            raise ValueError(f"privacy_egress_preview.{key} must be a non-negative integer")
+    redaction_count = privacy.get("redaction_count")
+    mode = privacy.get("mode")
+    if type(redaction_count) is not int or redaction_count < 0:
+        raise ValueError("privacy.redaction_count must be a non-negative integer")
+    if not isinstance(mode, str) or not mode:
+        raise ValueError("privacy.mode must be a nonempty string")
+    if preview.get("network_action") != "none":
+        raise ValueError("v0.2 egress preview network_action must be none")
     return EgressPreview(
-        files_selected=assessment.files_selected,
-        bytes_selected=assessment.bytes_selected,
-        files_omitted_by_policy=assessment.files_omitted_by_policy,
-        redaction_count=assessment.redaction_count,
-        sensitive_paths_omitted=assessment.sensitive_paths_omitted,
-        privacy_mode=config.privacy_mode,
+        files_selected=preview["files_selected"],
+        bytes_selected=preview["bytes_selected"],
+        files_omitted_by_policy=preview["files_omitted_by_policy"],
+        redaction_count=redaction_count,
+        sensitive_paths_omitted=preview["sensitive_paths_omitted"],
+        privacy_mode=mode,
         network_action="none",
     )
 

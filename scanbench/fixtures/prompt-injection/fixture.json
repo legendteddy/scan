@@ -1,0 +1,8 @@
+{
+  "name": "prompt-injection",
+  "version": "1",
+  "config": {},
+  "setup": {
+    "marker_absent": "PWNED"
+  }
+}

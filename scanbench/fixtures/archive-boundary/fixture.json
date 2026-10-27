@@ -1,0 +1,8 @@
+{
+  "name": "archive-boundary",
+  "version": "1",
+  "config": {},
+  "setup": {
+    "marker_absent": "ARCHIVE_EXECUTED"
+  }
+}

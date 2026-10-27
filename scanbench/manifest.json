@@ -1,0 +1,24 @@
+{
+  "scanbench_version": "1",
+  "dimensions": [
+    "inventory_completeness",
+    "state_integrity",
+    "evidence_correctness",
+    "privacy_integrity",
+    "safety_boundary_compliance"
+  ],
+  "fixtures": [
+    "clean-minimal",
+    "hidden-files",
+    "symlink-escape",
+    "prompt-injection",
+    "secret-redaction",
+    "malformed-filename",
+    "unreadable-artifact",
+    "archive-boundary",
+    "unsupported-binary",
+    "generated-and-vendor",
+    "incomplete-discovery",
+    "false-runtime-claim"
+  ]
+}

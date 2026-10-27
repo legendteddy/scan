@@ -1,0 +1,434 @@
+{
+  "actions": [],
+  "artifacts": [
+    {
+      "content_identity": "sha256:1a3eebf3701bf2aa4d26a487bb1fa80a41cb0884a78658930e46dd5d1a051b74",
+      "evidence_ids": [
+        "evidence:93ca95f9e9a0c56a139a"
+      ],
+      "id": "artifact:62d0a0ae93133a7aad1a",
+      "inspected_at": "<volatile-time>",
+      "inspection_origin": "fresh",
+      "locator": "app.txt",
+      "media_type": "text/plain",
+      "path_kind": "file",
+      "reason": "bytes hashed; semantic behavior not analyzed",
+      "redaction_count": 0,
+      "redaction_state": "none",
+      "size_bytes": 16,
+      "status": "content_read",
+      "type": "file"
+    }
+  ],
+  "checks": [
+    {
+      "artifact_ids": [],
+      "category": "purpose_and_scope",
+      "evidence_ids": [],
+      "id": "check-purpose_and_scope",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "purpose and scope",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [
+        "artifact:62d0a0ae93133a7aad1a"
+      ],
+      "category": "inventory_and_provenance",
+      "evidence_ids": [
+        "evidence:93ca95f9e9a0c56a139a"
+      ],
+      "id": "check-inventory_and_provenance",
+      "limitations": "This check does not establish semantic correctness or runtime behavior",
+      "method": "Deterministic Scan Core inventory and snapshot construction",
+      "next_step": null,
+      "reason": "Scan Core performs deterministic inventory as part of the v0.2 baseline",
+      "related_ids": [],
+      "result": "Inventory and content identities were established within configured limits",
+      "scope": "Declared local project scope",
+      "status": "assessed",
+      "title": "Inventory and provenance",
+      "verification_state": "static"
+    },
+    {
+      "artifact_ids": [],
+      "category": "architecture_and_flows",
+      "evidence_ids": [],
+      "id": "check-architecture_and_flows",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "architecture and flows",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "correctness_and_integrity",
+      "evidence_ids": [],
+      "id": "check-correctness_and_integrity",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "correctness and integrity",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "security_and_trust",
+      "evidence_ids": [],
+      "id": "check-security_and_trust",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "security and trust",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "privacy_and_data_lifecycle",
+      "evidence_ids": [],
+      "id": "check-privacy_and_data_lifecycle",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "privacy and data lifecycle",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "dependencies_and_licensing",
+      "evidence_ids": [],
+      "id": "check-dependencies_and_licensing",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "dependencies and licensing",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "testing_and_reliability",
+      "evidence_ids": [],
+      "id": "check-testing_and_reliability",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "testing and reliability",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "performance_and_resources",
+      "evidence_ids": [],
+      "id": "check-performance_and_resources",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "performance and resources",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "maintainability",
+      "evidence_ids": [],
+      "id": "check-maintainability",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "maintainability",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "usability_and_accessibility",
+      "evidence_ids": [],
+      "id": "check-usability_and_accessibility",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "usability and accessibility",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "operations_and_recovery",
+      "evidence_ids": [],
+      "id": "check-operations_and_recovery",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "operations and recovery",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "release_and_distribution",
+      "evidence_ids": [],
+      "id": "check-release_and_distribution",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "release and distribution",
+      "verification_state": "unverified"
+    },
+    {
+      "artifact_ids": [],
+      "category": "content_and_data_quality",
+      "evidence_ids": [],
+      "id": "check-content_and_data_quality",
+      "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+      "method": "Not performed by deterministic Scan Core state construction",
+      "next_step": "Perform this check using an authorized analyzer and attach evidence",
+      "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
+      "related_ids": [],
+      "result": "No assessment result is available",
+      "scope": "Declared local project scope",
+      "status": "not_assessed",
+      "title": "content and data quality",
+      "verification_state": "unverified"
+    }
+  ],
+  "components": [],
+  "continuation": {
+    "authorization_note": "This state does not authorize target execution, modification or network egress",
+    "completed": [
+      "Deterministic inventory",
+      "Snapshot identity",
+      "Canonical Scan 1.3 state construction"
+    ],
+    "decisions": [
+      "Target code was not executed",
+      "No network operation was performed"
+    ],
+    "hypotheses": [],
+    "remaining": [
+      "Perform semantic analysis for applicable check categories",
+      "Perform runtime verification only where separately authorized"
+    ],
+    "revalidation": [
+      "Rebuild inventory and compare snapshot digest after source-byte or path changes"
+    ],
+    "source_needs": [
+      "Original project bytes are required for deeper semantic continuation"
+    ]
+  },
+  "controls": [],
+  "coverage": {
+    "analysis_complete": false,
+    "checks_complete": false,
+    "checks_not_performed": [
+      "purpose_and_scope",
+      "architecture_and_flows",
+      "correctness_and_integrity",
+      "security_and_trust",
+      "privacy_and_data_lifecycle",
+      "dependencies_and_licensing",
+      "testing_and_reliability",
+      "performance_and_resources",
+      "maintainability",
+      "usability_and_accessibility",
+      "operations_and_recovery",
+      "release_and_distribution",
+      "content_and_data_quality"
+    ],
+    "checks_performed": [
+      "inventory_and_provenance"
+    ],
+    "counts_by_check_status": {
+      "assessed": 1,
+      "not_assessed": 13
+    },
+    "counts_by_status": {
+      "content_read": 1
+    },
+    "discovered_artifact_count": 1,
+    "discovery_complete": true,
+    "limits": [
+      "Semantic analysis has not been performed by deterministic Scan Core"
+    ],
+    "methods": [
+      "filesystem metadata inventory",
+      "bounded SHA-256 hashing",
+      "canonical snapshot manifest"
+    ],
+    "redacted_artifact_count": 0,
+    "resource_limits_hit": [],
+    "sampling": "No intentional sampling; reads are bounded by configured resource ceilings",
+    "sensitive_omissions": [],
+    "snapshot_consistency": "Snapshot digest is derived from a canonically ordered normalized manifest",
+    "unreadable_artifact_count": 0
+  },
+  "evidence": [
+    {
+      "artifact_id": "artifact:62d0a0ae93133a7aad1a",
+      "claim": "Scan Core deterministically inventoried this artifact",
+      "id": "evidence:93ca95f9e9a0c56a139a",
+      "inspection_origin": "fresh",
+      "kind": "static",
+      "limitations": "bytes hashed; semantic behavior not analyzed",
+      "locator": "app.txt",
+      "method": "read-only filesystem metadata inventory and bounded SHA-256 hashing",
+      "producer": {
+        "kind": "scan-core",
+        "name": "scan-core",
+        "version": "0.2.0.dev6"
+      },
+      "result": "{\"content_identity\":\"sha256:1a3eebf3701bf2aa4d26a487bb1fa80a41cb0884a78658930e46dd5d1a051b74\",\"excluded\":false,\"path_kind\":\"file\",\"size_bytes\":16,\"symlink_scope\":null}",
+      "source_digest": "sha256:1a3eebf3701bf2aa4d26a487bb1fa80a41cb0884a78658930e46dd5d1a051b74",
+      "time": "<volatile-time>"
+    }
+  ],
+  "extensions": {
+    "critical_artifact_selection": "Not determined by deterministic inventory; semantic selection is required",
+    "inventory_total_hashed_bytes": 16,
+    "privacy_egress_preview": {
+      "bytes_selected": 16,
+      "files_omitted_by_policy": 0,
+      "files_selected": 1,
+      "network_action": "none",
+      "sensitive_paths_omitted": 0
+    },
+    "privacy_execution": "Deterministic privacy assessment completed; raw matched sensitive values are not stored in canonical state",
+    "snapshot_identity_complete": true,
+    "tool_owned_omissions": []
+  },
+  "findings": [],
+  "privacy": {
+    "egress_bytes": 0,
+    "egress_performed": false,
+    "mode": "offline",
+    "redaction_count": 0,
+    "redaction_level": "standard",
+    "sensitive_path_count": 0
+  },
+  "project": {
+    "critical_artifact_ids": [],
+    "exclusions": [],
+    "name": "project",
+    "purpose": "Establish a deterministic static inventory and snapshot baseline",
+    "scope": "Project-local filesystem tree rooted at the declared scan path",
+    "snapshot": {
+      "identity": "sha256:02b420d2396c3586b0e8eecab4bcd4b3843dbff90dda5152ec7c2990457e1c22",
+      "time": "<volatile-time>"
+    },
+    "source_locators": [
+      "."
+    ],
+    "target_types": [
+      "local_directory"
+    ]
+  },
+  "provenance": {
+    "configuration_digest": "sha256:ca4e15769a0ef4917e4a140e0f275cac0c94514384ac9adc46a6de280ab19166",
+    "root_identity": "root:7bc401ba9fac844bfc9a59a7",
+    "snapshot_digest": "sha256:02b420d2396c3586b0e8eecab4bcd4b3843dbff90dda5152ec7c2990457e1c22",
+    "state_digest_algorithm": "sha256",
+    "tool_versions": [
+      {
+        "kind": "scan-core",
+        "name": "scan-core",
+        "version": "0.2.0.dev6"
+      }
+    ]
+  },
+  "relationships": [],
+  "run": {
+    "completed_at": "<volatile-time>",
+    "mode": "static",
+    "network_used": false,
+    "scan_id": "<volatile-run-id>",
+    "scan_version": "0.2.0.dev6",
+    "started_at": "<volatile-time>",
+    "target_executed": false
+  },
+  "schema_version": "1.3",
+  "summary": {
+    "condition": "Inventory baseline available; semantic analysis and runtime verification remain incomplete",
+    "evidence_ids": [
+      "evidence:93ca95f9e9a0c56a139a"
+    ],
+    "limitations": "Hashing and metadata inspection do not prove correctness, security, test status, deployment state or runtime behavior",
+    "operation": "Read filesystem metadata and hash eligible file bytes within configured ceilings",
+    "overview": "Deterministic inventory and provenance baseline created without executing target code",
+    "priorities": [
+      "Continue with evidence-backed semantic checks rather than inferring correctness from hashing"
+    ],
+    "readiness": "not established",
+    "strengths": [
+      "Artifact IDs and snapshot identity are deterministic for unchanged normalized input"
+    ]
+  },
+  "unknowns": [
+    {
+      "artifact_ids": [],
+      "evidence_ids": [],
+      "id": "unknown:semantic-runtime",
+      "impact": "Project readiness cannot be established from this state alone",
+      "next_safe_step": "Perform authorized semantic checks and runtime verification where appropriate",
+      "question": "What semantic behavior, correctness, security and runtime properties do these artifacts have?",
+      "reason": "Deterministic inventory and hashing do not answer semantic or runtime questions"
+    }
+  ]
+}

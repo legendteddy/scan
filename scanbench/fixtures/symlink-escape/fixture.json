@@ -1,0 +1,13 @@
+{
+  "name": "symlink-escape",
+  "version": "1",
+  "config": {
+    "follow_internal_links": true
+  },
+  "setup": {
+    "external_symlink": {
+      "link": "escape",
+      "outside_file": "outside.txt"
+    }
+  }
+}

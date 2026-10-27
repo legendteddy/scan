@@ -1,0 +1,26 @@
+{
+  "assertions": [
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": "blob.bin"
+    },
+    {
+      "dimension": "evidence_correctness",
+      "type": "artifact_status",
+      "value": "content_read",
+      "locator": "blob.bin"
+    },
+    {
+      "dimension": "privacy_integrity",
+      "type": "artifact_redaction_state",
+      "value": "metadata_only",
+      "locator": "blob.bin"
+    },
+    {
+      "dimension": "evidence_correctness",
+      "type": "analysis_complete",
+      "value": false
+    }
+  ]
+}

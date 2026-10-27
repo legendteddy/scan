@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/legendteddy/scan/schema/scan-state-1.2.schema.json",
+  "title": "Scan report state 1.2",
+  "type": "object",
+  "required": ["schema_version", "project", "summary", "coverage", "continuation", "extensions", "checks", "artifacts", "components", "relationships", "evidence", "findings", "controls", "unknowns", "actions"],
+  "properties": {
+    "schema_version": {"const": "1.2"},
+    "project": {"type": "object"},
+    "summary": {"type": "object"},
+    "coverage": {"type": "object"},
+    "continuation": {"type": "object"},
+    "extensions": {"type": "object"},
+    "checks": {"type": "array", "items": {"type": "object"}},
+    "artifacts": {"type": "array", "items": {"type": "object", "required": ["id", "locator", "type", "status", "reason", "evidence_ids", "inspection_origin", "inspected_at", "content_identity"]}},
+    "components": {"type": "array", "items": {"type": "object"}},
+    "relationships": {"type": "array", "items": {"type": "object"}},
+    "evidence": {"type": "array", "items": {"type": "object"}},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "controls": {"type": "array", "items": {"type": "object"}},
+    "unknowns": {"type": "array", "items": {"type": "object"}},
+    "actions": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true,
+  "$comment": "Structural interchange schema. The Scan validator additionally enforces references, coverage reconciliation, evidence provenance and completion invariants."
+}

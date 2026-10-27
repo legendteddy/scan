@@ -1,4 +1,4 @@
-"""Scan v0.2 command-line interface skeleton and stable exit codes."""
+"""Scan v0.2 command-line interface and stable exit codes."""
 
 from __future__ import annotations
 
@@ -10,10 +10,6 @@ from typing import Sequence
 
 from .config import ScanConfig
 from .core import scan_project
-from .inventory import build_inventory
-from .privacy import build_egress_preview
-from .render import render_report
-from .version import __version__
 from .errors import (
     CommandError,
     CoverageThresholdError,
@@ -23,9 +19,28 @@ from .errors import (
     SourceError,
     ValidationError,
 )
+from .inventory import build_inventory
+from .privacy import build_egress_preview
+from .render import render_report
+from .scanbench import format_bench, run_bench
+from .schema import schema_text
+from .settings import load_project_settings
 from .validate import validate_path
+from .version import __version__
 
 UTILITY_COMMANDS = {"validate", "render", "bench", "schema", "egress"}
+
+
+def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool) -> None:
+    parser.add_argument("--privacy", choices=("offline", "local", "controlled-remote"), default=None)
+    if include_offline:
+        parser.add_argument("--offline", action="store_true", help="Explicit shorthand for --privacy offline")
+    parser.add_argument("--redact", choices=("none", "standard", "strict"), default=None)
+    parser.add_argument("--exclude", action="append", default=None)
+    parser.add_argument("--sensitive-path", action="append", default=None)
+    parser.add_argument("--max-file-bytes", type=int, default=None)
+    parser.add_argument("--max-total-bytes", type=int, default=None)
+    parser.add_argument("--follow-internal-links", action="store_true", default=None)
 
 
 def _primary_parser() -> argparse.ArgumentParser:
@@ -34,14 +49,7 @@ def _primary_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, default=Path(".scan/report.html"))
     parser.add_argument("--state", type=Path, default=Path(".scan/state.json"))
     parser.add_argument("--no-html", action="store_true")
-    parser.add_argument("--privacy", choices=("offline", "local", "controlled-remote"), default="offline")
-    parser.add_argument("--offline", action="store_true", help="Explicit shorthand for --privacy offline")
-    parser.add_argument("--redact", choices=("none", "standard", "strict"), default="standard")
-    parser.add_argument("--exclude", action="append", default=[])
-    parser.add_argument("--sensitive-path", action="append", default=[])
-    parser.add_argument("--max-file-bytes", type=int, default=5_000_000)
-    parser.add_argument("--max-total-bytes", type=int, default=250_000_000)
-    parser.add_argument("--follow-internal-links", action="store_true")
+    _add_scan_options(parser, include_offline=True)
     parser.add_argument("--fail-on", choices=("PARTIAL", "ERROR"))
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--quiet", action="store_true")
@@ -58,19 +66,63 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
         parser.add_argument("--output", type=Path, required=True)
     elif command == "bench":
         parser.add_argument("fixture", nargs="?")
+        parser.add_argument("--json", action="store_true")
     elif command == "schema":
         parser.add_argument("--version", choices=("1.2", "1.3"), default="1.3")
     elif command == "egress":
         parser.add_argument("path", nargs="?", type=Path, default=Path("."))
-        parser.add_argument("--privacy", choices=("offline", "local", "controlled-remote"), default="controlled-remote")
-        parser.add_argument("--redact", choices=("none", "standard", "strict"), default="standard")
-        parser.add_argument("--exclude", action="append", default=[])
-        parser.add_argument("--sensitive-path", action="append", default=[])
-        parser.add_argument("--max-file-bytes", type=int, default=5_000_000)
-        parser.add_argument("--max-total-bytes", type=int, default=250_000_000)
-        parser.add_argument("--follow-internal-links", action="store_true")
+        _add_scan_options(parser, include_offline=False)
         parser.add_argument("--json", action="store_true")
     return parser
+
+
+def _resolved_config(
+    root: Path,
+    args: argparse.Namespace,
+    *,
+    output_state: Path | None = None,
+    output_html: Path | None = None,
+) -> ScanConfig:
+    settings = load_project_settings(root)
+    explicit_privacy = getattr(args, "privacy", None)
+    offline = bool(getattr(args, "offline", False))
+    if offline and explicit_privacy not in (None, "offline"):
+        raise CommandError("--offline cannot be combined with a non-offline --privacy mode")
+    privacy = "offline" if offline else (explicit_privacy or settings.privacy_mode)
+    redact = getattr(args, "redact", None) or settings.redaction_level
+    excludes = tuple(args.exclude) if getattr(args, "exclude", None) is not None else settings.excludes
+    sensitive = (
+        tuple(args.sensitive_path)
+        if getattr(args, "sensitive_path", None) is not None
+        else settings.sensitive_paths
+    )
+    max_file = (
+        args.max_file_bytes
+        if getattr(args, "max_file_bytes", None) is not None
+        else settings.max_file_bytes
+    )
+    max_total = (
+        args.max_total_bytes
+        if getattr(args, "max_total_bytes", None) is not None
+        else settings.max_total_bytes
+    )
+    follow = (
+        args.follow_internal_links
+        if getattr(args, "follow_internal_links", None) is not None
+        else settings.follow_internal_links
+    )
+    return ScanConfig(
+        root=root,
+        output_state=output_state,
+        output_html=output_html,
+        privacy_mode=privacy,
+        redaction_level=redact,
+        excludes=excludes,
+        sensitive_paths=sensitive,
+        max_file_bytes=max_file,
+        max_total_bytes=max_total,
+        follow_internal_links=follow,
+    )
 
 
 def _run_utility(command: str, argv: Sequence[str]) -> int:
@@ -86,20 +138,23 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
         state = validate_path(args.state_json)
         render_report(state, args.output)
         return int(ExitCode.OK)
+    if command == "bench":
+        result = run_bench(fixture=args.fixture)
+        if args.json:
+            print(json.dumps(result.as_dict(), ensure_ascii=True, sort_keys=True, separators=(",", ":")))
+        else:
+            print(format_bench(result))
+        return int(ExitCode.OK if result.passed else ExitCode.VALIDATION_FAILED)
+    if command == "schema":
+        text = schema_text(args.version)
+        print(text, end="" if text.endswith("\n") else "\n")
+        return int(ExitCode.OK)
     if command == "egress":
         if not args.path.exists():
             raise SourceError(f"Source path does not exist: {args.path}")
-        config = ScanConfig(
-            root=args.path,
-            privacy_mode=args.privacy,
-            redaction_level=args.redact,
-            excludes=tuple(args.exclude),
-            sensitive_paths=tuple(args.sensitive_path),
-            max_file_bytes=args.max_file_bytes,
-            max_total_bytes=args.max_total_bytes,
-            follow_internal_links=args.follow_internal_links,
-        )
-        preview = build_egress_preview(config, build_inventory(config))
+        config = _resolved_config(args.path, args)
+        inventory = build_inventory(config, _internal_ignores=(".scan", ".scan/**"))
+        preview = build_egress_preview(config, inventory)
         payload = preview.as_dict()
         if args.json:
             print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
@@ -112,7 +167,7 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
             print(f"privacy mode: {payload['privacy_mode']}")
             print("network action: none")
         return int(ExitCode.OK)
-    raise CommandError(f"'scan {command}' is reserved by the v0.2 contract but is not implemented in this slice")
+    raise CommandError(f"Unknown utility command: {command}")
 
 
 def _run_primary(argv: Sequence[str]) -> int:
@@ -120,21 +175,11 @@ def _run_primary(argv: Sequence[str]) -> int:
     root = Path(args.path)
     if not root.exists():
         raise SourceError(f"Source path does not exist: {root}")
-
-    if args.offline and args.privacy != "offline":
-        raise CommandError("--offline cannot be combined with a non-offline --privacy mode")
-
-    config = ScanConfig(
-        root=root,
+    config = _resolved_config(
+        root,
+        args,
         output_state=args.state,
         output_html=None if args.no_html else args.output,
-        privacy_mode="offline" if args.offline else args.privacy,
-        redaction_level=args.redact,
-        excludes=tuple(args.exclude),
-        sensitive_paths=tuple(args.sensitive_path),
-        max_file_bytes=args.max_file_bytes,
-        max_total_bytes=args.max_total_bytes,
-        follow_internal_links=args.follow_internal_links,
     )
     result = scan_project(config)
     summary = {

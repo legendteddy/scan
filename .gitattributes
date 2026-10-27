@@ -1,0 +1,7 @@
+# ScanBench fixture bytes are part of deterministic snapshot expectations.
+scanbench/** text eol=lf
+tests/golden/**/*.json text eol=lf
+
+# Binary fixtures must never receive text normalization.
+scanbench/**/*.zip -text
+scanbench/**/*.bin -text

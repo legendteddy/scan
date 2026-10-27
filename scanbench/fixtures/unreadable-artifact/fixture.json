@@ -1,0 +1,8 @@
+{
+  "name": "unreadable-artifact",
+  "version": "1",
+  "config": {},
+  "setup": {
+    "lock_file": "locked.txt"
+  }
+}

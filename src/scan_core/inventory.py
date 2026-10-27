@@ -15,6 +15,12 @@ from .errors import SourceError
 from .ids import artifact_id, normalize_locator, sha256_bytes
 
 
+def _safe_error(error: BaseException) -> str:
+    """Return a stable error label without serializing host filesystem paths."""
+    errno = getattr(error, "errno", None)
+    return error.__class__.__name__ + (f"(errno={errno})" if errno is not None else "")
+
+
 @dataclass(frozen=True)
 class InventoryArtifact:
     id: str
@@ -131,16 +137,16 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
             entries = sorted(os.scandir(directory), key=lambda item: item.name)
         except OSError as error:
             discovery_complete = False
-            warnings.append(f"Cannot enumerate {normalize_locator(root, directory)}: {error}")
+            warnings.append(f"Cannot enumerate {normalize_locator(root, directory)}: {_safe_error(error)}")
             return
 
         for entry in entries:
             path = Path(entry.path)
             try:
                 locator = normalize_locator(root, path)
-            except ValueError as error:
+            except ValueError:
                 discovery_complete = False
-                warnings.append(str(error))
+                warnings.append("Path normalization rejected an entry outside the declared root")
                 continue
 
             if _is_excluded(locator, _internal_ignores):
@@ -154,7 +160,7 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
                 add_artifact(InventoryArtifact(
                     id=artifact_id(locator), locator=locator, display_name=entry.name,
                     path_kind="unknown", size_bytes=0,
-                    content_identity="unreadable:lstat-failed", reason=str(error),
+                    content_identity="unreadable:lstat-failed", reason=_safe_error(error),
                 ))
                 continue
 
@@ -166,7 +172,7 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
                     raw_target = ""
                     scope, resolved = "unresolved", None
                     identity_complete = False
-                    warnings.append(f"Cannot read symlink target for {locator}: {error}")
+                    warnings.append(f"Cannot read symlink target for {locator}: {_safe_error(error)}")
                 else:
                     scope, resolved = _symlink_scope(root, path)
                 identity = "symlink-target:" + sha256_bytes(
@@ -249,8 +255,8 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
             except OSError as error:
                 identity_complete = False
                 identity = "unreadable:hash-failed"
-                warnings.append(f"Cannot hash {locator}: {error}")
-                reason = str(error)
+                warnings.append(f"Cannot hash {locator}: {_safe_error(error)}")
+                reason = _safe_error(error)
             else:
                 if exceeded or identity is None:
                     identity_complete = False

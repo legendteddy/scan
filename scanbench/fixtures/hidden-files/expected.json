@@ -1,0 +1,19 @@
+{
+  "assertions": [
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": ".hidden.txt"
+    },
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": "visible.txt"
+    },
+    {
+      "dimension": "state_integrity",
+      "type": "snapshot_repeat",
+      "value": true
+    }
+  ]
+}
