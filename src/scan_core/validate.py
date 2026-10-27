@@ -81,6 +81,12 @@ class StateParser(HTMLParser):
         super().__init__()
         self.blocks = []
         self.active = False
+        self.visible_counts = {}
+        self._count_tag = None
+        self._count_key = None
+        self._count_text = []
+        self.external_resources = []
+        self.executable_scripts = 0
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
@@ -89,14 +95,36 @@ class StateParser(HTMLParser):
                     'State ID must belong to an inert application/json script')
             self.blocks.append('')
             self.active = True
+        elif tag == 'script' and attrs.get('type') != 'application/json':
+            self.executable_scripts += 1
+
+        count_key = attrs.get('data-scan-count')
+        if count_key is not None:
+            require(self._count_key is None, 'Nested data-scan-count markers are not allowed')
+            require(count_key not in self.visible_counts, 'Duplicate visible count marker: ' + count_key)
+            self._count_tag = tag
+            self._count_key = count_key
+            self._count_text = []
+
+        if tag in {'script', 'link', 'img', 'source', 'iframe', 'audio', 'video'}:
+            resource = attrs.get('src') or attrs.get('href')
+            if isinstance(resource, str) and resource.strip().lower().startswith(('http://', 'https://', '//')):
+                self.external_resources.append(resource)
 
     def handle_endtag(self, tag):
         if tag == 'script':
             self.active = False
+        if self._count_key is not None and tag == self._count_tag:
+            self.visible_counts[self._count_key] = ''.join(self._count_text).strip()
+            self._count_tag = None
+            self._count_key = None
+            self._count_text = []
 
     def handle_data(self, data):
         if self.active:
             self.blocks[-1] += data
+        if self._count_key is not None:
+            self._count_text.append(data)
 
 
 def unique_keys(pairs):
@@ -423,19 +451,48 @@ def validate_state(state: Mapping[str, Any], version: str | None = None):
         f'Unsupported Scan schema_version {declared!r}; supported: 1.2, 1.3')
 
 
-def load_report_state(path: str | Path):
-    """Extract inert canonical state from a Scan HTML report without executing it."""
+def _parse_report(path: str | Path):
     parser = StateParser()
     with open(path, encoding='utf-8') as stream:
         parser.feed(stream.read())
     require(len(parser.blocks) == 1, 'Expected exactly one authoritative ' + STATE_ID + ' block')
     require(not any(c in parser.blocks[0] for c in '<>&'), 'Escape <, > and & in embedded JSON')
-    return json.loads(parser.blocks[0], object_pairs_hook=unique_keys, parse_constant=reject_constant)
+    state = json.loads(parser.blocks[0], object_pairs_hook=unique_keys, parse_constant=reject_constant)
+    return parser, state
+
+
+def load_report_state(path: str | Path):
+    """Extract inert canonical state from a Scan HTML report without executing it."""
+    _parser, state = _parse_report(path)
+    return state
+
+
+def _expected_visible_counts(state):
+    coverage = state['coverage']
+    return {
+        'discovered_artifact_count': coverage['discovered_artifact_count'],
+        'content_read_count': coverage['counts_by_status'].get('content_read', 0),
+        'checks_assessed': coverage['counts_by_check_status'].get('assessed', 0),
+        'finding_count': len(state['findings']),
+        'redaction_count': state['privacy']['redaction_count'],
+        'unknown_count': len(state['unknowns']),
+    }
 
 
 def validate_report(path: str | Path):
-    state = load_report_state(path)
+    parser, state = _parse_report(path)
     validate_state(state)
+    if state.get('schema_version') == '1.3':
+        require(parser.executable_scripts == 0,
+                'Scan 1.3 report must not contain executable scripts')
+        require(not parser.external_resources,
+                'Scan 1.3 report must not reference external network resources')
+        expected = _expected_visible_counts(state)
+        require(set(parser.visible_counts) == set(expected),
+                'Scan 1.3 report visible count markers do not match renderer contract')
+        for key, value in expected.items():
+            require(parser.visible_counts[key] == str(value),
+                    f'Visible count {key} does not match embedded state')
     if state.get('schema_version') == '1.2':
         print('PASS: Scan 1.2 structure, typed references, artifact/check coverage, reuse and control evidence; semantic/visual review still required')
     return state

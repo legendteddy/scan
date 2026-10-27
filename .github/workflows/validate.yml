@@ -40,8 +40,11 @@ jobs:
         run: |
           scan --version
           scan validate examples/demo-report.html
-          scan scanbench/fixtures/inventory-basic/target --no-html --state "$RUNNER_TEMP/scan-state.json" --quiet
+          scan scanbench/fixtures/inventory-basic/target --offline --state "$RUNNER_TEMP/scan-state.json" --output "$RUNNER_TEMP/scan-report.html" --quiet
           scan validate "$RUNNER_TEMP/scan-state.json"
+          scan validate "$RUNNER_TEMP/scan-report.html"
+          scan render "$RUNNER_TEMP/scan-state.json" --output "$RUNNER_TEMP/scan-rerendered.html"
+          scan validate "$RUNNER_TEMP/scan-rerendered.html"
           scan egress scanbench/fixtures/privacy-redaction/target --privacy controlled-remote --redact strict --sensitive-path "private/**" --json
 
       - name: Verify reproducible synthetic report

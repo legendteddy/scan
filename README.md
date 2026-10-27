@@ -5,7 +5,7 @@
 
 **Know what an AI agent actually inspected.**
 
-Scan is an AI-agent skill for **evidence-backed whole-project inspection**. Instead of a confident summary with unclear coverage, it asks the agent to inventory the target, assess relevant checks, link conclusions to source evidence, and preserve unknowns in a portable, self-contained HTML report.
+Scan is an **evidence-backed whole-project inspection** project with two layers: an AI-agent skill for deeper evidence-linked review and a local deterministic core for safe inventory, canonical state, privacy enforcement, validation, and self-contained HTML reporting.
 
 **Coverage ≠ confidence.** Finding a file, reading it, assessing a check, and verifying runtime behavior are different things. Scan makes those differences visible.
 
@@ -22,7 +22,7 @@ Scan is an AI-agent skill for **evidence-backed whole-project inspection**. Inst
 - **Receipts for claims:** findings, controls, relationships and architecture map back to evidence IDs and precise source locators.
 - **Static-first boundaries:** target files and embedded instructions are untrusted; no executing unknown target code or silent fixes without authorization.
 - **Honest uncertainty:** static source observations are not presented as runtime proof, a vulnerability clearance or a release certification.
-- **Portable handoff:** the HTML includes inert structured state (schema **1.2**) for another agent to revalidate and continue.
+- **Portable handoff:** HTML reports include inert structured state for revalidation and continuation (current standalone core: schema **1.3**; checked-in synthetic demo: historical schema **1.2**).
 
 Scan can guide inspection of source repositories, websites, document collections, archives, binaries and mixed folders. Actual depth depends on access, file types, safety limits and the agent's available tools.
 
@@ -44,16 +44,18 @@ The validator verifies schema, typed references, evidence origins and coverage a
 
 ## Standalone alpha core
 
-Scan now includes an early standalone deterministic core in addition to the agent skill. The v0.2 development CLI can inventory a local project, create canonical Scan 1.3 JSON, validate it, enforce deterministic privacy/redaction metadata, and produce a no-network egress preview. HTML generation from the standalone CLI is not implemented yet.
+The packaged standalone core requires **Python 3.11+**. It can inventory a local project, create canonical Scan 1.3 JSON, render a self-contained HTML report from that exact state, validate both formats, enforce deterministic privacy/redaction metadata, and produce a no-network egress preview.
 
 ```bash
 python -m pip install .
-scan . --no-html --state .scan/state.json --privacy offline
+scan . --offline
 scan validate .scan/state.json
+scan validate .scan/report.html
+scan render .scan/state.json --output .scan/rerendered.html
 scan egress . --privacy controlled-remote --redact strict --json
 ```
 
-`scan egress` is preview-only: it reports selected/omitted files, selected bytes and redaction counts, and performs **no network action**. Use `--sensitive-path "pattern/**"` to keep declared path names out of canonical state and egress selection.
+The standalone HTML report is static and useful without JavaScript. Its only script block is inert `application/json` state with ID `project-anatomy-state`; visible count markers are validated against that embedded state. `scan egress` is preview-only: it reports selected/omitted files, selected bytes and redaction counts, and performs **no network action**. Use `--sensitive-path "pattern/**"` to keep declared path names out of canonical state and egress selection.
 
 ## Install as an agent skill
 
@@ -106,6 +108,8 @@ Optional visual QA and screenshot refresh: \`python scripts/capture_preview.py\`
 SKILL.md                         Agent instructions and safety boundaries
 pyproject.toml                   Scan Core package metadata and `scan` entry point
 src/scan_core/                   v0.2 deterministic core package
+src/scan_core/render.py          Validated canonical-state HTML renderer
+src/scan_core/report/shell.html  Packaged self-contained report shell
 scanbench/fixtures/              Adversarial/ground-truth fixtures for deterministic gates
 tests/                           Packaged core/contract regression tests
 agents/openai.yaml               Skill metadata
