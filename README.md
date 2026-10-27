@@ -103,6 +103,7 @@ scripts/build_demo_report.py     Reproducible synthetic example generator
 examples/demo-project/           Fictional five-file project
 examples/demo-report.html        Validated, self-contained Scan 1.2 example
 launch/launch-kit.md             Draft launch copy and approval checklist
+docs/v0.2-technical-spec.md      Proposed standalone Scan Core + CLI contract
 \`\`\`
 
 ## Contribute and report security issues
