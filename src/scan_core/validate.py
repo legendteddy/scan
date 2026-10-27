@@ -432,7 +432,120 @@ def _validate_state_1_3(state):
     return state
 
 
-SUPPORTED_SCHEMAS = ('1.2', '1.3')
+BASELINE_MODES = {'auto', 'none', 'explicit'}
+BASELINE_STATUSES = {'used', 'not_found', 'disabled', 'invalid', 'incompatible'}
+SNAPSHOT_RELATIONS = {'same', 'changed', 'unknown', 'none'}
+
+
+def _id_array(value, label):
+    require(isinstance(value, list) and all(string(item) for item in value),
+            label + ' must be a string array')
+    require(len(value) == len(set(value)), label + ' must not contain duplicate IDs')
+    return set(value)
+
+
+def _validate_state_1_4(state):
+    require(isinstance(state, dict), 'State must be an object')
+    require(state.get('schema_version') == '1.4', 'Expected Scan schema_version 1.4')
+
+    compatibility = dict(state)
+    compatibility['schema_version'] = '1.3'
+    _validate_state_1_3(compatibility)
+
+    baseline = state.get('baseline')
+    require(isinstance(baseline, dict), 'baseline must be an object')
+    baseline_keys = (
+        'mode', 'status', 'source_schema_version', 'source_state_digest',
+        'source_snapshot_digest', 'snapshot_relation', 'reuse_enabled',
+        'fresh_evidence_count', 'reused_evidence_count', 'rejected_reuse_count',
+        'rejected_reuse_reasons',
+    )
+    for key in baseline_keys:
+        require(key in baseline, 'baseline: missing ' + key)
+    require(baseline['mode'] in BASELINE_MODES, 'Invalid baseline.mode')
+    require(baseline['status'] in BASELINE_STATUSES, 'Invalid baseline.status')
+    require(baseline['snapshot_relation'] in SNAPSHOT_RELATIONS, 'Invalid baseline.snapshot_relation')
+    require(type(baseline['reuse_enabled']) is bool, 'baseline.reuse_enabled must be boolean')
+    for key in ('fresh_evidence_count', 'reused_evidence_count', 'rejected_reuse_count'):
+        require(type(baseline[key]) is int and baseline[key] >= 0,
+                'baseline.' + key + ' must be a non-negative integer')
+    reasons = baseline['rejected_reuse_reasons']
+    require(isinstance(reasons, dict) and all(string(key) and type(value) is int and value >= 0
+                                              for key, value in reasons.items()),
+            'baseline.rejected_reuse_reasons must map strings to non-negative integers')
+    require(sum(reasons.values()) == baseline['rejected_reuse_count'],
+            'baseline.rejected_reuse_reasons must sum to rejected_reuse_count')
+
+    if baseline['status'] == 'used':
+        require(baseline['source_schema_version'] in {'1.3', '1.4'},
+                'used baseline requires source_schema_version 1.3 or 1.4')
+        _sha256(baseline['source_state_digest'], 'baseline.source_state_digest')
+        _sha256(baseline['source_snapshot_digest'], 'baseline.source_snapshot_digest')
+        require(baseline['snapshot_relation'] in {'same', 'changed', 'unknown'},
+                'used baseline cannot have snapshot_relation none')
+    else:
+        require(baseline['source_schema_version'] is None,
+                'unused baseline source_schema_version must be null')
+        require(baseline['source_state_digest'] is None,
+                'unused baseline source_state_digest must be null')
+        require(baseline['source_snapshot_digest'] is None,
+                'unused baseline source_snapshot_digest must be null')
+        require(baseline['reused_evidence_count'] == 0,
+                'unused baseline cannot record reused evidence')
+
+    if baseline['mode'] == 'none':
+        require(baseline['status'] == 'disabled', 'baseline mode none requires status disabled')
+        require(baseline['reuse_enabled'] is False, 'baseline mode none cannot enable reuse')
+
+    delta = state.get('delta')
+    require(isinstance(delta, dict), 'delta must be an object')
+    require(type(delta.get('available')) is bool, 'delta.available must be boolean')
+    for key in ('artifacts', 'findings', 'unknowns'):
+        require(isinstance(delta.get(key), dict), 'delta.' + key + ' must be an object')
+
+    artifact_delta = delta['artifacts']
+    artifact_sets = {
+        key: _id_array(artifact_delta.get(key), 'delta.artifacts.' + key)
+        for key in ('added', 'changed', 'removed', 'unchanged')
+    }
+    current_artifacts = {row['id'] for row in state['artifacts']}
+    require(artifact_sets['added'] <= current_artifacts, 'delta.artifacts.added contains unknown current IDs')
+    require(artifact_sets['changed'] <= current_artifacts, 'delta.artifacts.changed contains unknown current IDs')
+    require(artifact_sets['unchanged'] <= current_artifacts, 'delta.artifacts.unchanged contains unknown current IDs')
+    require(not (artifact_sets['removed'] & current_artifacts),
+            'delta.artifacts.removed cannot contain current artifact IDs')
+    require(sum(len(values) for values in artifact_sets.values()) == len(set().union(*artifact_sets.values())),
+            'artifact delta categories must be disjoint')
+
+    for collection, state_key in (('findings', 'findings'), ('unknowns', 'unknowns')):
+        row = delta[collection]
+        sets = {
+            key: _id_array(row.get(key), f'delta.{collection}.{key}')
+            for key in ('new', 'resolved', 'persisting', 'modified')
+        }
+        current_ids = {item['id'] for item in state[state_key]}
+        require(sets['new'] <= current_ids, f'delta.{collection}.new contains unknown current IDs')
+        require(sets['persisting'] <= current_ids, f'delta.{collection}.persisting contains unknown current IDs')
+        require(sets['modified'] <= sets['persisting'], f'delta.{collection}.modified must be a subset of persisting')
+        require(not (sets['resolved'] & current_ids), f'delta.{collection}.resolved cannot contain current IDs')
+        require(not (sets['new'] & sets['persisting']), f'delta.{collection}.new and persisting must be disjoint')
+        require(not (sets['new'] & sets['resolved']), f'delta.{collection}.new and resolved must be disjoint')
+        require(not (sets['persisting'] & sets['resolved']), f'delta.{collection}.persisting and resolved must be disjoint')
+
+    if delta['available']:
+        require(baseline['status'] == 'used', 'delta.available=true requires a used baseline')
+    else:
+        require(baseline['status'] != 'used', 'used baseline requires delta.available=true')
+        require(all(not values for values in artifact_sets.values()),
+                'unavailable delta must have empty artifact categories')
+        for collection in ('findings', 'unknowns'):
+            require(all(not delta[collection][key] for key in ('new', 'resolved', 'persisting', 'modified')),
+                    'unavailable delta must have empty ' + collection + ' categories')
+
+    return state
+
+
+SUPPORTED_SCHEMAS = ('1.2', '1.3', '1.4')
 PLANNED_SCHEMAS = ()
 
 
@@ -447,8 +560,10 @@ def validate_state(state: Mapping[str, Any], version: str | None = None):
         return _validate_state_1_2(state)
     if declared == '1.3':
         return _validate_state_1_3(state)
+    if declared == '1.4':
+        return _validate_state_1_4(state)
     raise UnsupportedSchemaError(
-        f'Unsupported Scan schema_version {declared!r}; supported: 1.2, 1.3')
+        f'Unsupported Scan schema_version {declared!r}; supported: 1.2, 1.3, 1.4')
 
 
 def _parse_report(path: str | Path):
@@ -482,14 +597,15 @@ def _expected_visible_counts(state):
 def validate_report(path: str | Path):
     parser, state = _parse_report(path)
     validate_state(state)
-    if state.get('schema_version') == '1.3':
+    if state.get('schema_version') in {'1.3', '1.4'}:
+        version = state['schema_version']
         require(parser.executable_scripts == 0,
-                'Scan 1.3 report must not contain executable scripts')
+                f'Scan {version} report must not contain executable scripts')
         require(not parser.external_resources,
-                'Scan 1.3 report must not reference external network resources')
+                f'Scan {version} report must not reference external network resources')
         expected = _expected_visible_counts(state)
         require(set(parser.visible_counts) == set(expected),
-                'Scan 1.3 report visible count markers do not match renderer contract')
+                f'Scan {version} report visible count markers do not match renderer contract')
         for key, value in expected.items():
             require(parser.visible_counts[key] == str(value),
                     f'Visible count {key} does not match embedded state')

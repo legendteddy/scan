@@ -19,8 +19,8 @@ DEMO = ROOT / "examples" / "demo-report.html"
 
 
 class SliceOneTests(unittest.TestCase):
-    def test_version_is_v02_development_release(self):
-        self.assertTrue(__version__.startswith("0.2."))
+    def test_version_is_current_development_release(self):
+        self.assertEqual(__version__, "0.3.0.dev1")
 
     def test_scan_config_normalizes_root_to_path(self):
         self.assertEqual(ScanConfig(root=".").root, Path("."))

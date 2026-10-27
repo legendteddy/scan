@@ -68,7 +68,7 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
         parser.add_argument("fixture", nargs="?")
         parser.add_argument("--json", action="store_true")
     elif command == "schema":
-        parser.add_argument("--version", choices=("1.2", "1.3"), default="1.3")
+        parser.add_argument("--version", choices=("1.2", "1.3", "1.4"), default="1.4")
     elif command == "egress":
         parser.add_argument("path", nargs="?", type=Path, default=Path("."))
         _add_scan_options(parser, include_offline=False)

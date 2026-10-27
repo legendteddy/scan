@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/legendteddy/scan/schema/scan-state-1.4.schema.json",
+  "title": "Scan report state 1.4",
+  "type": "object",
+  "required": ["schema_version", "run", "privacy", "provenance", "project", "summary", "coverage", "continuation", "extensions", "checks", "artifacts", "components", "relationships", "evidence", "findings", "controls", "unknowns", "actions", "baseline", "delta"],
+  "properties": {
+    "schema_version": {"const": "1.4"},
+    "run": {"type": "object", "required": ["scan_id", "scan_version", "started_at", "completed_at", "mode", "target_executed", "network_used"]},
+    "privacy": {"type": "object", "required": ["mode", "redaction_level", "redaction_count", "sensitive_path_count", "egress_performed", "egress_bytes"]},
+    "provenance": {"type": "object", "required": ["root_identity", "snapshot_digest", "state_digest_algorithm", "tool_versions", "configuration_digest"]},
+    "project": {"type": "object"},
+    "summary": {"type": "object"},
+    "coverage": {"type": "object", "required": ["resource_limits_hit", "unreadable_artifact_count", "redacted_artifact_count"]},
+    "continuation": {"type": "object"},
+    "extensions": {"type": "object"},
+    "checks": {"type": "array", "items": {"type": "object"}},
+    "artifacts": {"type": "array", "items": {"type": "object", "required": ["id", "locator", "type", "status", "reason", "evidence_ids", "inspection_origin", "inspected_at", "content_identity", "size_bytes", "media_type", "path_kind", "redaction_state"]}},
+    "components": {"type": "array", "items": {"type": "object"}},
+    "relationships": {"type": "array", "items": {"type": "object"}},
+    "evidence": {"type": "array", "items": {"type": "object", "required": ["producer", "source_digest"]}},
+    "findings": {"type": "array", "items": {"type": "object"}},
+    "controls": {"type": "array", "items": {"type": "object"}},
+    "unknowns": {"type": "array", "items": {"type": "object"}},
+    "actions": {"type": "array", "items": {"type": "object"}},
+    "baseline": {
+      "type": "object",
+      "required": ["mode", "status", "source_schema_version", "source_state_digest", "source_snapshot_digest", "snapshot_relation", "reuse_enabled", "fresh_evidence_count", "reused_evidence_count", "rejected_reuse_count", "rejected_reuse_reasons"]
+    },
+    "delta": {
+      "type": "object",
+      "required": ["available", "artifacts", "findings", "unknowns"],
+      "properties": {
+        "available": {"type": "boolean"},
+        "artifacts": {"type": "object", "required": ["added", "changed", "removed", "unchanged"]},
+        "findings": {"type": "object", "required": ["new", "resolved", "persisting", "modified"]},
+        "unknowns": {"type": "object", "required": ["new", "resolved", "persisting", "modified"]}
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$comment": "Structural interchange schema. The Scan validator additionally enforces typed references, baseline/delta reconciliation, privacy/count reconciliation, provenance and report-embedding invariants."
+}

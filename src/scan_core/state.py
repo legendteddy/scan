@@ -8,7 +8,7 @@ import hashlib
 import json
 import mimetypes
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from .config import ScanConfig
 from .inventory import InventoryArtifact, InventoryResult
@@ -38,9 +38,14 @@ def _sha256_json(value: Any) -> str:
     return "sha256:" + hashlib.sha256(_canonical_bytes(value)).hexdigest()
 
 
-def canonical_state_json(state: dict[str, Any]) -> str:
+def canonical_state_json(state: Mapping[str, Any]) -> str:
     """Serialize state deterministically without losing Unicode path names."""
-    return _canonical_bytes(state).decode("utf-8", errors="surrogatepass")
+    return _canonical_bytes(dict(state)).decode("utf-8", errors="surrogatepass")
+
+
+def state_digest(state: Mapping[str, Any]) -> str:
+    """Return the canonical digest of an exact Scan state record."""
+    return _sha256_json(dict(state))
 
 
 def configuration_digest(config: ScanConfig) -> str:
