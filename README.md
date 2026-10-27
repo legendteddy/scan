@@ -22,7 +22,7 @@ Scan is an **evidence-backed whole-project inspection** project with two layers:
 - **Receipts for claims:** findings, controls, relationships and architecture map back to evidence IDs and precise source locators.
 - **Static-first boundaries:** target files and embedded instructions are untrusted; no executing unknown target code or silent fixes without authorization.
 - **Honest uncertainty:** static source observations are not presented as runtime proof, a vulnerability clearance or a release certification.
-- **Portable handoff:** HTML reports include inert structured state for revalidation and continuation (current standalone core: schema **1.3**; checked-in synthetic demo: historical schema **1.2**).
+- **Portable handoff:** HTML reports include inert structured state for revalidation and continuation (current standalone core: schema **1.4**; checked-in synthetic demo: historical schema **1.2**).
 
 Scan can guide inspection of source repositories, websites, document collections, archives, binaries and mixed folders. Actual depth depends on access, file types, safety limits and the agent's available tools.
 
@@ -44,15 +44,18 @@ The validator verifies schema, typed references, evidence origins and coverage a
 
 ## Standalone alpha core
 
-The packaged standalone core requires **Python 3.11+**. It can inventory a local project, create canonical Scan 1.3 JSON, render a self-contained HTML report from that exact state, validate both formats, enforce deterministic privacy/redaction metadata, and produce a no-network egress preview.
+The packaged standalone core requires **Python 3.11+**. It can inventory a local project, create canonical Scan 1.4 JSON, compare repeated scans against a prior local state, render a self-contained HTML report from that exact state, validate both formats, enforce deterministic privacy/redaction metadata, and produce a no-network egress preview.
 
 ```bash
 python -m pip install .
 scan . --offline
+# Change the project, then scan again. The prior .scan/state.json is used locally as the baseline.
+scan . --offline
 scan validate .scan/state.json
 scan validate .scan/report.html
+scan compare previous-state.json .scan/state.json --json
 scan render .scan/state.json --output .scan/rerendered.html
-scan schema --version 1.3
+scan schema --version 1.4
 scan egress . --privacy controlled-remote --redact strict --json
 scan bench
 ```
@@ -73,9 +76,14 @@ follow_internal_links = false
 
 [exclude]
 patterns = ["vendor/**"]
+
+[baseline]
+mode = "auto"              # auto | none
+reuse = true
+max_state_bytes = 64000000
 ```
 
-Behavior-affecting resolved configuration is included in the canonical configuration digest. Scan configuration does not require secrets.
+Behavior-affecting resolved configuration is included in the canonical configuration digest. An explicit `--baseline PATH` is invocation-only and is never persisted automatically. Use `--baseline none` to disable comparison for a run; `--no-reuse` records that prior evidence must not be reused. Scan configuration does not require secrets.
 
 ### ScanBench v1
 
@@ -133,11 +141,13 @@ Optional visual QA and screenshot refresh: \`python scripts/capture_preview.py\`
 \`\`\`text
 SKILL.md                         Agent instructions and safety boundaries
 pyproject.toml                   Scan Core package metadata and `scan` entry point
-src/scan_core/                   v0.2 deterministic core package
+src/scan_core/                   v0.3 deterministic core package
+src/scan_core/baseline.py        Local-only bounded baseline resolver
+src/scan_core/compare.py         Pure deterministic 1.3/1.4 state comparison
 src/scan_core/render.py          Validated canonical-state HTML renderer
 src/scan_core/scanbench.py       ScanBench v1 deterministic harness
 src/scan_core/settings.py        `.scan/config.toml` loader and precedence defaults
-src/scan_core/schemas/           Bundled structural schemas 1.2 and 1.3
+src/scan_core/schemas/           Bundled structural schemas 1.2, 1.3 and 1.4
 src/scan_core/report/shell.html  Packaged self-contained report shell
 scanbench/fixtures/              12 mandatory adversarial/ground-truth v1 fixtures
 tests/                           Packaged core/contract regression tests
@@ -155,6 +165,7 @@ examples/demo-report.html        Validated, self-contained Scan 1.2 example
 launch/launch-kit.md             Draft launch copy and approval checklist
 docs/v0.2-technical-spec.md      Approved standalone Scan Core + CLI contract
 docs/v0.2-compatibility.md       Python/schema/config/ScanBench compatibility boundary
+docs/v0.3-technical-spec.md      Approved repeat-scan baseline/diff contract
 \`\`\`
 
 ## Contribute and report security issues

@@ -38,10 +38,10 @@ def fixture_state(root: Path = FIXTURE, **config_overrides):
 
 
 class State13Tests(unittest.TestCase):
-    def test_generated_state_13_validates(self):
+    def test_generated_state_14_validates(self):
         _config, _inventory, snapshot, state = fixture_state()
-        validated = validate_state(state, version="1.3")
-        self.assertEqual(validated["schema_version"], "1.3")
+        validated = validate_state(state, version="1.4")
+        self.assertEqual(validated["schema_version"], "1.4")
         self.assertEqual(state["provenance"]["snapshot_digest"], snapshot.digest)
 
     def test_deterministic_core_never_promotes_hashing_to_analyzed(self):
@@ -147,7 +147,7 @@ class State13Tests(unittest.TestCase):
             self.assertEqual(result.completion, "partial")
             self.assertEqual(result.state_path, output)
             loaded = validate_path(output)
-            self.assertEqual(loaded["schema_version"], "1.3")
+            self.assertEqual(loaded["schema_version"], "1.4")
             self.assertEqual(output.read_text(encoding="utf-8").rstrip("\n"), canonical_state_json(result.state))
 
     def test_scan_owned_output_inside_target_does_not_change_repeat_snapshot(self):
@@ -168,7 +168,7 @@ class State13Tests(unittest.TestCase):
                 code = main([str(FIXTURE), "--no-html", "--state", str(output), "--json"])
             self.assertEqual(code, ExitCode.OK)
             self.assertTrue(output.exists())
-            self.assertEqual(validate_path(output)["schema_version"], "1.3")
+            self.assertEqual(validate_path(output)["schema_version"], "1.4")
 
     def test_cli_default_html_path_is_supported_after_renderer_slice(self):
         with tempfile.TemporaryDirectory() as directory:

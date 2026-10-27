@@ -349,7 +349,7 @@ def _run_fixture(bench_root: Path, fixture_name: str) -> FixtureResult:
             first_snapshot = build_snapshot(inventory)
             second_snapshot = build_snapshot(build_inventory(config))
             result = scan_project(config)
-            validate_state(result.state, version="1.3")
+            validate_state(result.state, version="1.4")
             validate_report(report_path)
             context = _FixtureContext(
                 name=fixture_name,

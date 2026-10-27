@@ -1,4 +1,4 @@
-"""Canonical Scan state 1.3 construction and deterministic serialization."""
+"""Canonical Scan state construction and deterministic serialization."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from .snapshot import Snapshot
 from .validate import CHECK_CATEGORIES
 from .version import __version__
 
-SCHEMA_VERSION = "1.3"
+SCHEMA_VERSION = "1.4"
 
 
 def _utc_now() -> str:
@@ -58,6 +58,9 @@ def configuration_digest(config: ScanConfig) -> str:
         "max_file_bytes": config.max_file_bytes,
         "max_total_bytes": config.max_total_bytes,
         "follow_internal_links": config.follow_internal_links,
+        "baseline_mode": config.baseline_mode,
+        "reuse_enabled": config.reuse_enabled,
+        "max_baseline_state_bytes": config.max_baseline_state_bytes,
     }
     return _sha256_json(payload)
 
@@ -187,7 +190,7 @@ def _check_rows(artifact_ids: list[str], evidence_ids: list[str], inventory_comp
                 "verification_state": verification_state,
                 "result": result,
                 "limitations": "This check does not establish semantic correctness or runtime behavior",
-                "reason": "Scan Core performs deterministic inventory as part of the v0.2 baseline",
+                "reason": "Scan Core performs deterministic inventory as part of the local baseline",
                 "next_step": next_step,
             })
         else:
@@ -218,8 +221,9 @@ def build_state(
     privacy: PrivacyAssessment | None = None,
     started_at: str | None = None,
     completed_at: str | None = None,
+    baseline_status: str | None = None,
 ) -> dict[str, Any]:
-    """Build canonical Scan 1.3 state from deterministic inventory and snapshot data."""
+    """Build canonical Scan 1.4 state from deterministic inventory and snapshot data."""
     started = started_at or _utc_now()
     completed = completed_at or started
     config_digest = configuration_digest(config)
@@ -287,6 +291,26 @@ def build_state(
         remaining.insert(0, "Resolve incomplete inventory/content identity boundaries and rerun")
 
     project_name = inventory.root.name or "project"
+    resolved_baseline_status = baseline_status or ("disabled" if config.baseline_mode == "none" else "not_found")
+    baseline = {
+        "mode": config.baseline_mode,
+        "status": resolved_baseline_status,
+        "source_schema_version": None,
+        "source_state_digest": None,
+        "source_snapshot_digest": None,
+        "snapshot_relation": "none",
+        "reuse_enabled": config.reuse_enabled if config.baseline_mode != "none" else False,
+        "fresh_evidence_count": len(evidence),
+        "reused_evidence_count": 0,
+        "rejected_reuse_count": 0,
+        "rejected_reuse_reasons": {},
+    }
+    delta = {
+        "available": False,
+        "artifacts": {"added": [], "changed": [], "removed": [], "unchanged": []},
+        "findings": {"new": [], "resolved": [], "persisting": [], "modified": []},
+        "unknowns": {"new": [], "resolved": [], "persisting": [], "modified": []},
+    }
     state: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "run": {
@@ -313,6 +337,8 @@ def build_state(
             "tool_versions": [{"kind": "scan-core", "name": "scan-core", "version": __version__}],
             "configuration_digest": config_digest,
         },
+        "baseline": baseline,
+        "delta": delta,
         "project": {
             "name": project_name,
             "purpose": "Establish a deterministic static inventory and snapshot baseline",
@@ -359,7 +385,7 @@ def build_state(
             "redacted_artifact_count": redacted_artifact_count,
         },
         "continuation": {
-            "completed": ["Deterministic inventory", "Snapshot identity", "Canonical Scan 1.3 state construction"],
+            "completed": ["Deterministic inventory", "Snapshot identity", "Canonical Scan 1.4 state construction"],
             "remaining": remaining,
             "hypotheses": [],
             "decisions": ["Target code was not executed", "No network operation was performed"],
