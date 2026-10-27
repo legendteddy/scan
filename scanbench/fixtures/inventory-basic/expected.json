@@ -1,0 +1,3 @@
+{
+  "locators": ["-leading.txt", ".hidden.txt", "nested", "nested/data.txt", "unicode-λ.txt"]
+}
