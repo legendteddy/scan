@@ -405,6 +405,19 @@ def render_html(state: Mapping[str, Any]) -> str:
         limitations_text = "; ".join(git_state.get("limitations", [])) or "No additional Git provenance limits recorded."
         git_detail = limitations_text
 
+    git_scope = validated.get("extensions", {}).get("git_change_scope")
+    git_scope_card = ""
+    if isinstance(git_scope, dict):
+        changed_count = sum(
+            len(git_scope.get(key, []))
+            for key in ("added", "modified", "deleted", "renamed", "copied", "untracked")
+        )
+        git_scope_card = (
+            '<article class="insight"><span>Git change scope</span>'
+            f'<h3>{_h(git_scope.get("base_ref", "unknown"))} ? {_h(git_scope.get("head_ref", "HEAD"))}</h3>'
+            f'<p>{changed_count} advisory path changes. Full Scan inventory remains authoritative.</p></article>'
+        )
+
     mode_section = (
         '<section class="section" aria-labelledby="mode-title">'
         '<div class="section-head"><div class="section-kicker">Inspection boundary</div>'
@@ -413,7 +426,8 @@ def render_html(state: Mapping[str, Any]) -> str:
         '<div class="insights"><article class="insight"><span>Mode contract</span>'
         f'<h3>{_h(scan_mode)}</h3><p>{_h(coverage["sampling"])}</p></article>'
         '<article class="insight"><span>Repository provenance</span>'
-        f'<h3>{_h(git_identity)}</h3><p>{_h(git_detail)}</p></article></div></section>'
+        f'<h3>{_h(git_identity)}</h3><p>{_h(git_detail)}</p></article>'
+        f'{git_scope_card}</div></section>'
     )
     target_specific = _baseline_section(validated) + mode_section + (
         '<section class="section" aria-labelledby="privacy-title">'

@@ -51,6 +51,8 @@ python -m pip install .
 scan . --offline
 # Change the project, then scan again. The prior .scan/state.json is used locally as the baseline.
 scan . --offline
+# Optional local-only Git prioritization context; full Scan inventory still runs.
+scan . --offline --changed-since origin/main
 scan validate .scan/state.json
 scan validate .scan/report.html
 scan compare previous-state.json .scan/state.json --json
@@ -205,6 +207,7 @@ pyproject.toml                   Scan Core package metadata and `scan` entry poi
 src/scan_core/                   v0.3 deterministic core package
 src/scan_core/baseline.py        Local-only bounded baseline resolver
 src/scan_core/compare.py         Pure deterministic 1.3/1.4 state comparison
+src/scan_core/git_change.py      Local-only advisory Git changed-scope integration
 src/scan_core/reuse.py           Strict evidence freshness/reuse decision engine
 src/scan_core/render.py          Validated canonical-state HTML renderer
 src/scan_core/scanbench.py       ScanBench v1 deterministic harness

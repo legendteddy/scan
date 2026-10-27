@@ -2,7 +2,7 @@
 
 The v0.2 line established deterministic inventory, canonical state, privacy,
 self-contained rendering and ScanBench. The v0.3 line adds repeat-scan state
-comparison, local baselines and strict evidence freshness/reuse semantics.
+comparison, local baselines, strict evidence freshness/reuse semantics and local Git change context.
 """
 
 from .builder import (

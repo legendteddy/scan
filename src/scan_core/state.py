@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .config import ScanConfig, mode_contract
+from .git_change import GitChangeScope
 from .git_provenance import GitProvenance
 from .inventory import InventoryArtifact, InventoryResult
 from .privacy import PrivacyAssessment, path_is_sensitive
@@ -63,6 +64,7 @@ def configuration_digest(config: ScanConfig) -> str:
         "baseline_mode": config.baseline_mode,
         "reuse_enabled": config.reuse_enabled,
         "max_baseline_state_bytes": config.max_baseline_state_bytes,
+        "changed_since": config.changed_since,
     }
     return _sha256_json(payload)
 
@@ -230,6 +232,7 @@ def build_state(
     *,
     privacy: PrivacyAssessment | None = None,
     git_provenance: GitProvenance | None = None,
+    git_change_scope: GitChangeScope | None = None,
     started_at: str | None = None,
     completed_at: str | None = None,
     baseline_status: str | None = None,
@@ -310,6 +313,9 @@ def build_state(
         remaining.insert(0, "Resolve incomplete inventory/content identity boundaries and rerun")
 
     git = git_provenance or GitProvenance(detected=False)
+    tool_versions = [{"kind": "scan-core", "name": "scan-core", "version": __version__}]
+    if git_change_scope is not None:
+        tool_versions.append({"kind": "external-tool", "name": "git", "version": git_change_scope.git_version})
     sampling = {
         "quick": "Intentional triage boundary: common dependency/build/cache and Git-internal trees are recorded as mode exclusions; semantic agents must limit conclusions to inspected high-value paths.",
         "deep": "No intentional first-party sampling; reads are bounded by configured resource ceilings, with Git internal storage represented separately from ordinary project artifacts.",
@@ -361,7 +367,7 @@ def build_state(
             "root_identity": "root:" + hashlib.sha256(snapshot.digest.encode("ascii")).hexdigest()[:24],
             "snapshot_digest": snapshot.digest,
             "state_digest_algorithm": "sha256",
-            "tool_versions": [{"kind": "scan-core", "name": "scan-core", "version": __version__}],
+            "tool_versions": tool_versions,
             "configuration_digest": config_digest,
             "git": git.as_dict(),
         },
@@ -464,4 +470,6 @@ def build_state(
             "inventory_total_hashed_bytes": inventory.total_hashed_bytes,
         },
     }
+    if git_change_scope is not None:
+        state["extensions"]["git_change_scope"] = git_change_scope.as_dict()
     return state
