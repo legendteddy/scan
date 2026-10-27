@@ -52,10 +52,36 @@ scan . --offline
 scan validate .scan/state.json
 scan validate .scan/report.html
 scan render .scan/state.json --output .scan/rerendered.html
+scan schema --version 1.3
 scan egress . --privacy controlled-remote --redact strict --json
+scan bench
 ```
 
 The standalone HTML report is static and useful without JavaScript. Its only script block is inert `application/json` state with ID `project-anatomy-state`; visible count markers are validated against that embedded state. `scan egress` is preview-only: it reports selected/omitted files, selected bytes and redaction counts, and performs **no network action**. Use `--sensitive-path "pattern/**"` to keep declared path names out of canonical state and egress selection.
+
+### Project configuration
+
+Optional configuration lives at `.scan/config.toml`. Precedence is **CLI arguments > project config > built-in defaults**.
+
+```toml
+[scan]
+privacy = "offline"
+redact = "standard"
+max_file_bytes = 5000000
+max_total_bytes = 250000000
+follow_internal_links = false
+
+[exclude]
+patterns = ["vendor/**"]
+```
+
+Behavior-affecting resolved configuration is included in the canonical configuration digest. Scan configuration does not require secrets.
+
+### ScanBench v1
+
+`scan bench` runs 12 mandatory synthetic adversarial fixtures covering hidden files, escaping symlinks, prompt injection, redaction, hostile filenames, unreadable content, archives, unsupported binaries, generated/vendor files, resource boundaries and false runtime claims. Results are reported separately for **inventory completeness, state integrity, evidence correctness, privacy integrity, and safety-boundary compliance**. ScanBench deliberately does **not** calculate a blended quality score.
+
+Run one fixture with `scan bench FIXTURE`. The installed wheel carries the same canonical fixture data, so this works outside the source checkout as well.
 
 ## Install as an agent skill
 
@@ -109,8 +135,11 @@ SKILL.md                         Agent instructions and safety boundaries
 pyproject.toml                   Scan Core package metadata and `scan` entry point
 src/scan_core/                   v0.2 deterministic core package
 src/scan_core/render.py          Validated canonical-state HTML renderer
+src/scan_core/scanbench.py       ScanBench v1 deterministic harness
+src/scan_core/settings.py        `.scan/config.toml` loader and precedence defaults
+src/scan_core/schemas/           Bundled structural schemas 1.2 and 1.3
 src/scan_core/report/shell.html  Packaged self-contained report shell
-scanbench/fixtures/              Adversarial/ground-truth fixtures for deterministic gates
+scanbench/fixtures/              12 mandatory adversarial/ground-truth v1 fixtures
 tests/                           Packaged core/contract regression tests
 agents/openai.yaml               Skill metadata
 assets/report-shell.html         Self-contained HTML dashboard template
@@ -125,6 +154,7 @@ examples/demo-project/           Fictional five-file project
 examples/demo-report.html        Validated, self-contained Scan 1.2 example
 launch/launch-kit.md             Draft launch copy and approval checklist
 docs/v0.2-technical-spec.md      Approved standalone Scan Core + CLI contract
+docs/v0.2-compatibility.md       Python/schema/config/ScanBench compatibility boundary
 \`\`\`
 
 ## Contribute and report security issues

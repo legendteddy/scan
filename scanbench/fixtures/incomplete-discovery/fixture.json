@@ -1,0 +1,8 @@
+{
+  "name": "incomplete-discovery",
+  "version": "1",
+  "config": {
+    "max_total_bytes": 3
+  },
+  "setup": {}
+}

@@ -1,0 +1,9 @@
+{
+  "name": "secret-redaction",
+  "version": "1",
+  "config": {
+    "redaction_level": "standard",
+    "privacy_mode": "offline"
+  },
+  "setup": {}
+}

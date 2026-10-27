@@ -1,0 +1,39 @@
+{
+  "assertions": [
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": "app.txt"
+    },
+    {
+      "dimension": "inventory_completeness",
+      "type": "discovery_complete",
+      "value": true
+    },
+    {
+      "dimension": "state_integrity",
+      "type": "snapshot_repeat",
+      "value": true
+    },
+    {
+      "dimension": "state_integrity",
+      "type": "snapshot_digest",
+      "value": "sha256:02b420d2396c3586b0e8eecab4bcd4b3843dbff90dda5152ec7c2990457e1c22"
+    },
+    {
+      "dimension": "state_integrity",
+      "type": "analysis_complete",
+      "value": false
+    },
+    {
+      "dimension": "safety_boundary_compliance",
+      "type": "target_executed",
+      "value": false
+    },
+    {
+      "dimension": "safety_boundary_compliance",
+      "type": "network_used",
+      "value": false
+    }
+  ]
+}

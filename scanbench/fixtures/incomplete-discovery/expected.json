@@ -1,0 +1,29 @@
+{
+  "assertions": [
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": "a.txt"
+    },
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": "b.txt"
+    },
+    {
+      "dimension": "state_integrity",
+      "type": "identity_complete",
+      "value": false
+    },
+    {
+      "dimension": "state_integrity",
+      "type": "resource_limit_contains",
+      "value": "max_total_bytes"
+    },
+    {
+      "dimension": "evidence_correctness",
+      "type": "analysis_complete",
+      "value": false
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "assertions": [
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": "locked.txt"
+    },
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_status",
+      "value": "unreadable",
+      "locator": "locked.txt"
+    },
+    {
+      "dimension": "state_integrity",
+      "type": "unreadable_count",
+      "value": 1
+    },
+    {
+      "dimension": "state_integrity",
+      "type": "identity_complete",
+      "value": false
+    },
+    {
+      "dimension": "evidence_correctness",
+      "type": "analysis_complete",
+      "value": false
+    }
+  ]
+}

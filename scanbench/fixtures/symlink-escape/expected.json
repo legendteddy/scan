@@ -1,0 +1,31 @@
+{
+  "assertions": [
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_locator_present",
+      "value": "escape"
+    },
+    {
+      "dimension": "inventory_completeness",
+      "type": "artifact_kind",
+      "value": "symlink",
+      "locator": "escape"
+    },
+    {
+      "dimension": "safety_boundary_compliance",
+      "type": "symlink_scope",
+      "value": "external",
+      "locator": "escape"
+    },
+    {
+      "dimension": "safety_boundary_compliance",
+      "type": "artifact_locator_absent",
+      "value": "escape/outside.txt"
+    },
+    {
+      "dimension": "safety_boundary_compliance",
+      "type": "target_executed",
+      "value": false
+    }
+  ]
+}

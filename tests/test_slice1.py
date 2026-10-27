@@ -60,10 +60,10 @@ class SliceOneTests(unittest.TestCase):
                 code = main(["validate", str(path)])
         self.assertEqual(code, ExitCode.VALIDATION_FAILED)
 
-    def test_cli_reserved_command_uses_exit_2(self):
-        with contextlib.redirect_stderr(io.StringIO()):
-            code = main(["bench"])
-        self.assertEqual(code, ExitCode.COMMAND_ERROR)
+    def test_cli_bench_is_available_after_release_hardening(self):
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            code = main(["bench", "clean-minimal"])
+        self.assertEqual(code, ExitCode.OK)
 
     def test_cli_primary_scan_remains_available_after_later_slices(self):
         with tempfile.TemporaryDirectory() as directory:
