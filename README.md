@@ -59,6 +59,22 @@ scan bench
 
 The standalone HTML report is static and useful without JavaScript. Its only script block is inert `application/json` state with ID `project-anatomy-state`; visible count markers are validated against that embedded state. `scan egress` is preview-only: it reports selected/omitted files, selected bytes and redaction counts, and performs **no network action**. Use `--sensitive-path "pattern/**"` to keep declared path names out of canonical state and egress selection.
 
+### Scan modes
+
+Scan exposes explicit coverage promises instead of silently sampling:
+
+- `--mode quick` is triage: it inventories the project while suppressing common dependency/build/cache trees and Git internals from ordinary content analysis. A quick scan is always presented as partial and its continuation state points to `deep`.
+- `--mode deep` is the default whole-project first-party mode. It broadly accounts for safely readable project content while treating `.git/**` as repository provenance rather than normal source.
+- `--mode forensic` opts repository internals back in for provenance-heavy or historical investigation. Explicit user exclusions and normal safety/resource boundaries still apply.
+
+Git repositories record bounded HEAD/branch/commit and sanitized remote metadata separately. Scan deliberately does not invoke Git status, hooks, filesystem monitors or target-configured helpers merely to determine clean/dirty state; that field is recorded as `not_assessed` unless established by an authorized higher-level analyzer.
+
+```bash
+scan . --offline --mode quick
+scan . --offline --mode deep
+scan . --offline --mode forensic
+```
+
 ### Project configuration
 
 Optional configuration lives at `.scan/config.toml`. Precedence is **CLI arguments > project config > built-in defaults**.
@@ -67,6 +83,7 @@ Optional configuration lives at `.scan/config.toml`. Precedence is **CLI argumen
 [scan]
 privacy = "offline"
 redact = "standard"
+mode = "deep"
 max_file_bytes = 5000000
 max_total_bytes = 250000000
 follow_internal_links = false
@@ -76,6 +93,44 @@ patterns = ["vendor/**"]
 ```
 
 Behavior-affecting resolved configuration is included in the canonical configuration digest. Scan configuration does not require secrets.
+
+### Semantic builder API
+
+Semantic agents can extend valid deterministic state without hand-authoring nested JSON. `SemanticStateBuilder` provides typed record helpers for components, evidence, relationships, findings, controls, unknowns, actions and checks; scalar/string-array references are normalized, generated IDs are deterministic, and bad references fail with the record ID and field path. The strict Scan validator still runs on `build()`.
+
+```python
+from scan_core import SemanticStateBuilder
+
+builder = SemanticStateBuilder.from_state(core_state)
+evidence_id = builder.add_evidence(
+    artifact_id=artifact["id"],
+    locator=artifact["locator"],
+    kind="static",
+    claim="Configuration path was reviewed",
+    result="The path is resolved locally",
+    method="semantic source review",
+    limitations="Runtime behavior was not observed",
+    source_digest=artifact["content_identity"],
+    producer_kind="local-model",
+    producer_name="review-agent",
+    producer_version="1",
+)
+builder.add_finding(
+    title="Example finding",
+    impact="Explain the user-visible consequence",
+    severity="medium",
+    confidence="high",
+    verification_state="static",
+    artifact_ids=artifact["id"],
+    evidence_ids=evidence_id,
+    uncertainty="Runtime behavior remains unverified",
+    recommendation="Address the evidenced condition",
+    safe_verification="Re-read the affected source and validate the state",
+)
+semantic_state = builder.build()
+```
+
+`upgrade_semantic_state(core_state)` is a convenience alias for starting the same builder from deterministic state. Raw canonical JSON remains supported for advanced callers.
 
 ### ScanBench v1
 

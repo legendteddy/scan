@@ -319,6 +319,9 @@ def _validate_state_1_3(state):
     completed_at = _rfc3339(run['completed_at'], 'run.completed_at')
     require(completed_at >= started_at, 'run.completed_at cannot precede run.started_at')
     require(run['mode'] == 'static', 'v0.2 core state run.mode must be static')
+    scan_mode = run.get('scan_mode')
+    if scan_mode is not None:
+        require(scan_mode in {'quick', 'deep', 'forensic'}, 'run.scan_mode must be quick, deep, or forensic')
     require(run['target_executed'] is False, 'v0.2 core-generated state cannot claim target execution')
     require(type(run['network_used']) is bool, 'run.network_used must be boolean')
 
@@ -353,6 +356,22 @@ def _validate_state_1_3(state):
             require(string(tool.get(key)), label + '.' + key + ' must be nonempty')
     require(state['project']['snapshot'].get('identity') == provenance['snapshot_digest'],
             'project.snapshot identity must equal provenance.snapshot_digest')
+
+    git = provenance.get('git')
+    if git is not None:
+        require(isinstance(git, dict), 'provenance.git must be an object')
+        require(type(git.get('detected')) is bool, 'provenance.git.detected must be boolean')
+        for key in ('head', 'branch', 'commit'):
+            require(git.get(key) is None or string(git.get(key)), f'provenance.git.{key} must be null or nonempty string')
+        require(git.get('working_tree_status') in {'not_assessed', 'clean', 'dirty', 'unknown'},
+                'Invalid provenance.git.working_tree_status')
+        require(isinstance(git.get('remotes'), list), 'provenance.git.remotes must be an array')
+        for index, remote in enumerate(git['remotes']):
+            require(isinstance(remote, dict), f'provenance.git.remotes[{index}] must be an object')
+            require(string(remote.get('name')), f'provenance.git.remotes[{index}].name must be nonempty')
+            require(string(remote.get('url')), f'provenance.git.remotes[{index}].url must be nonempty')
+        require(isinstance(git.get('limitations'), list) and all(string(v) for v in git['limitations']),
+                'provenance.git.limitations must be a string array')
 
     redacted_count = 0
     redaction_matches = 0
@@ -399,6 +418,18 @@ def _validate_state_1_3(state):
                     label + 'evidence locator must use the artifact redacted locator surrogate')
 
     coverage = state['coverage']
+    if scan_mode is not None:
+        mode_state = state.get('extensions', {}).get('scan_mode')
+        require(isinstance(mode_state, dict), 'extensions.scan_mode must be an object when run.scan_mode is present')
+        require(mode_state.get('name') == scan_mode, 'extensions.scan_mode.name must match run.scan_mode')
+        require(string(mode_state.get('coverage_contract')), 'extensions.scan_mode.coverage_contract must be nonempty')
+        require(isinstance(mode_state.get('mode_exclusions'), list) and all(string(v) for v in mode_state['mode_exclusions']),
+                'extensions.scan_mode.mode_exclusions must be a string array')
+        expected_deeper = 'deep' if scan_mode == 'quick' else ('forensic' if scan_mode == 'deep' else None)
+        require(mode_state.get('deeper_mode') == expected_deeper, 'extensions.scan_mode.deeper_mode is inconsistent')
+        if scan_mode == 'quick':
+            require(coverage['analysis_complete'] is False,
+                    'quick mode cannot claim whole-project analysis_complete=true')
     for key in ('resource_limits_hit', 'unreadable_artifact_count', 'redacted_artifact_count'):
         require(key in coverage, 'coverage: missing ' + key)
     require(isinstance(coverage['resource_limits_hit'], list) and

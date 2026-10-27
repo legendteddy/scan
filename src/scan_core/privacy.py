@@ -91,7 +91,7 @@ _TOKEN_RE = re.compile(
     r"(?<![A-Za-z0-9])(?:AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9]{20,255}|github_pat_[A-Za-z0-9_]{20,255}|sk-[A-Za-z0-9_-]{20,255})(?![A-Za-z0-9])"
 )
 _SECRET_ASSIGNMENT_RE = re.compile(
-    r"(?im)(?P<prefix>\b(?:[A-Z0-9_.-]*?(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)[A-Z0-9_.-]*)\b\s*(?::|=)\s*)(?P<quote>['\"]?)(?P<value>[^\s'\"#,;}{\]\[]+)(?P=quote)"
+    r"(?im)(?P<key>\b[A-Z0-9_.-]+\b)(?P<separator>\s*(?::|=)\s*)(?P<quote>['\"]?)(?P<value>[^\s'\"#,;}{\]\[]+)(?P=quote)"
 )
 _EMAIL_RE = re.compile(r"(?<![\w.+-])[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}(?![\w.-])", re.IGNORECASE)
 _PHONE_RE = re.compile(r"(?<!\w)(?:\+?\d[\d ()-]{7,}\d)(?!\w)")
@@ -111,6 +111,43 @@ def _replace_assignment(pattern: re.Pattern[str], text: str, label: str) -> tupl
     return pattern.subn(replacement, text)
 
 
+def _secret_assignment_key(key: str) -> bool:
+    """Classify credential labels without treating token-like identifiers as secrets."""
+    normalized = re.sub(r"[.-]+", "_", key.strip().lower())
+    parts = [part for part in normalized.split("_") if part]
+    joined = "_".join(parts)
+    if any(part in {"password", "passwd", "pwd", "secret"} for part in parts):
+        return True
+    if joined in {"apikey", "accesskey", "privatekey"}:
+        return True
+    if any(
+        pair in joined
+        for pair in ("api_key", "access_key", "private_key")
+    ):
+        return True
+    if "token" not in parts:
+        return False
+    token_context = {
+        "api", "auth", "access", "refresh", "bearer", "github", "gitlab",
+        "service", "credential", "secret", "key", "value", "session", "csrf", "id",
+    }
+    context = set(parts) - {"token"}
+    return not context or bool(context & token_context)
+
+
+def _replace_secret_assignments(text: str, label: str) -> tuple[str, int]:
+    count = 0
+
+    def replacement(match: re.Match[str]) -> str:
+        nonlocal count
+        if not _secret_assignment_key(match.group("key")):
+            return match.group(0)
+        count += 1
+        return match.group("key") + match.group("separator") + f"[REDACTED:{label}]"
+
+    return _SECRET_ASSIGNMENT_RE.sub(replacement, text), count
+
+
 def redact_value(value: str, policy: RedactionPolicy) -> RedactionResult:
     """Redact deterministic sensitive patterns without retaining matched values."""
     if policy.level == "none":
@@ -120,19 +157,19 @@ def redact_value(value: str, policy: RedactionPolicy) -> RedactionResult:
     count = 0
     categories: list[str] = []
 
-    for pattern, label, assignment in (
-        (_PRIVATE_KEY_RE, "private-key", False),
-        (_TOKEN_RE, "credential", False),
-        (_SECRET_ASSIGNMENT_RE, "credential", True),
+    for pattern, label in (
+        (_PRIVATE_KEY_RE, "private-key"),
+        (_TOKEN_RE, "credential"),
     ):
-        text, found = (
-            _replace_assignment(pattern, text, label)
-            if assignment
-            else _replace_simple(pattern, text, label)
-        )
+        text, found = _replace_simple(pattern, text, label)
         if found:
             count += found
             categories.extend([label] * found)
+
+    text, found = _replace_secret_assignments(text, "credential")
+    if found:
+        count += found
+        categories.extend(["credential"] * found)
 
     if policy.level == "strict":
         for pattern, label, assignment in (

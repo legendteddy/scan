@@ -10,7 +10,8 @@ import mimetypes
 from pathlib import Path
 from typing import Any, Mapping
 
-from .config import ScanConfig
+from .config import ScanConfig, mode_contract
+from .git_provenance import GitProvenance
 from .inventory import InventoryArtifact, InventoryResult
 from .privacy import PrivacyAssessment, path_is_sensitive
 from .snapshot import Snapshot
@@ -53,6 +54,7 @@ def configuration_digest(config: ScanConfig) -> str:
     payload = {
         "privacy_mode": config.privacy_mode,
         "redaction_level": config.redaction_level,
+        "scan_mode": config.scan_mode,
         "excludes": sorted(pattern.replace("\\", "/") for pattern in config.excludes),
         "sensitive_paths": sorted(pattern.replace("\\", "/") for pattern in config.sensitive_paths),
         "max_file_bytes": config.max_file_bytes,
@@ -216,6 +218,7 @@ def build_state(
     snapshot: Snapshot,
     *,
     privacy: PrivacyAssessment | None = None,
+    git_provenance: GitProvenance | None = None,
     started_at: str | None = None,
     completed_at: str | None = None,
 ) -> dict[str, Any]:
@@ -274,7 +277,11 @@ def build_state(
         if row.sensitive_path
     ]
 
-    limits = ["Semantic analysis has not been performed by deterministic Scan Core"]
+    contract = mode_contract(config.scan_mode)
+    limits = [
+        "Semantic analysis has not been performed by deterministic Scan Core",
+        contract,
+    ]
     limits.extend(_privacy_safe_text(value, privacy) for value in inventory.resource_limits_hit)
     limits.extend(_privacy_safe_text(value, privacy) for value in inventory.warnings)
     if privacy is not None:
@@ -283,8 +290,19 @@ def build_state(
         "Perform semantic analysis for applicable check categories",
         "Perform runtime verification only where separately authorized",
     ]
+    if config.scan_mode == "quick":
+        remaining.insert(0, "Run deep mode for broad first-party semantic accounting before making whole-project completeness claims")
+    elif config.scan_mode == "deep":
+        remaining.append("Use forensic mode if Git internals or provenance-heavy historical evidence are material to the review")
     if not inventory.complete:
         remaining.insert(0, "Resolve incomplete inventory/content identity boundaries and rerun")
+
+    git = git_provenance or GitProvenance(detected=False)
+    sampling = {
+        "quick": "Intentional triage boundary: common dependency/build/cache and Git-internal trees are recorded as mode exclusions; semantic agents must limit conclusions to inspected high-value paths.",
+        "deep": "No intentional first-party sampling; reads are bounded by configured resource ceilings, with Git internal storage represented separately from ordinary project artifacts.",
+        "forensic": "No intentional mode suppression; reads are bounded only by explicit exclusions, safety boundaries and configured resource ceilings.",
+    }[config.scan_mode]
 
     project_name = inventory.root.name or "project"
     state: dict[str, Any] = {
@@ -295,6 +313,7 @@ def build_state(
             "started_at": started,
             "completed_at": completed,
             "mode": "static",
+            "scan_mode": config.scan_mode,
             "target_executed": False,
             "network_used": False,
         },
@@ -312,6 +331,7 @@ def build_state(
             "state_digest_algorithm": "sha256",
             "tool_versions": [{"kind": "scan-core", "name": "scan-core", "version": __version__}],
             "configuration_digest": config_digest,
+            "git": git.as_dict(),
         },
         "project": {
             "name": project_name,
@@ -322,6 +342,9 @@ def build_state(
             "scope": "Project-local filesystem tree rooted at the declared scan path",
             "exclusions": [
                 _safe_config_path(pattern, config) for pattern in config.excludes
+            ] + [
+                f"scan mode {config.scan_mode}: " + _safe_config_path(pattern, config)
+                for pattern in inventory.mode_omissions
             ] + [
                 "tool-owned output: " + _safe_config_path(pattern, config)
                 for pattern in inventory.tool_owned_omissions
@@ -346,7 +369,7 @@ def build_state(
             "counts_by_check_status": counts_by_check_status,
             "checks_complete": False,
             "limits": limits,
-            "sampling": "No intentional sampling; reads are bounded by configured resource ceilings",
+            "sampling": sampling,
             "methods": ["filesystem metadata inventory", "bounded SHA-256 hashing", "canonical snapshot manifest"],
             "checks_performed": ["inventory_and_provenance"],
             "checks_not_performed": [c for c in CHECK_CATEGORIES if c != "inventory_and_provenance"],
@@ -385,6 +408,12 @@ def build_state(
         }],
         "actions": [],
         "extensions": {
+            "scan_mode": {
+                "name": config.scan_mode,
+                "coverage_contract": contract,
+                "mode_exclusions": [_safe_config_path(pattern, config) for pattern in inventory.mode_omissions],
+                "deeper_mode": "deep" if config.scan_mode == "quick" else ("forensic" if config.scan_mode == "deep" else None),
+            },
             "critical_artifact_selection": "Not determined by deterministic inventory; semantic selection is required",
             "privacy_execution": "Deterministic privacy assessment completed; raw matched sensitive values are not stored in canonical state",
             "privacy_egress_preview": {

@@ -17,7 +17,7 @@ from validate_report import CHECK_CATEGORIES, validate
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "examples" / "demo-project"
 OUTPUT = ROOT / "examples" / "demo-report.html"
-SHELL = ROOT / "assets" / "report-shell.html"
+SHELL = ROOT / "scripts" / "report-shell-1.2.html"
 INSPECTED_AT = "2026-10-27T07:34:00Z"
 FILES = (
     "README.md",

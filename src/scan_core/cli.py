@@ -32,6 +32,7 @@ UTILITY_COMMANDS = {"validate", "render", "bench", "schema", "egress"}
 
 
 def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool) -> None:
+    parser.add_argument("--mode", choices=("quick", "deep", "forensic"), default=None)
     parser.add_argument("--privacy", choices=("offline", "local", "controlled-remote"), default=None)
     if include_offline:
         parser.add_argument("--offline", action="store_true", help="Explicit shorthand for --privacy offline")
@@ -90,6 +91,7 @@ def _resolved_config(
         raise CommandError("--offline cannot be combined with a non-offline --privacy mode")
     privacy = "offline" if offline else (explicit_privacy or settings.privacy_mode)
     redact = getattr(args, "redact", None) or settings.redaction_level
+    mode = getattr(args, "mode", None) or settings.scan_mode
     excludes = tuple(args.exclude) if getattr(args, "exclude", None) is not None else settings.excludes
     sensitive = (
         tuple(args.sensitive_path)
@@ -117,6 +119,7 @@ def _resolved_config(
         output_html=output_html,
         privacy_mode=privacy,
         redaction_level=redact,
+        scan_mode=mode,
         excludes=excludes,
         sensitive_paths=sensitive,
         max_file_bytes=max_file,
@@ -185,6 +188,7 @@ def _run_primary(argv: Sequence[str]) -> int:
     summary = {
         "schema_version": result.state["schema_version"],
         "scan_id": result.state["run"]["scan_id"],
+        "mode": result.state["run"].get("scan_mode", "deep"),
         "snapshot_digest": result.state["provenance"]["snapshot_digest"],
         "artifact_count": result.state["coverage"]["discovered_artifact_count"],
         "completion": result.completion,
@@ -198,7 +202,7 @@ def _run_primary(argv: Sequence[str]) -> int:
         if summary["report_path"] is not None:
             print(f"Report written to {summary['report_path']}")
         print(f"Snapshot: {summary['snapshot_digest']}")
-        print(f"Artifacts: {summary['artifact_count']} | completion: {summary['completion']}")
+        print(f"Mode: {summary['mode']} | artifacts: {summary['artifact_count']} | completion: {summary['completion']}")
     if args.fail_on == "PARTIAL" and result.completion != "complete":
         raise CoverageThresholdError("scan completed but the requested PARTIAL threshold was not met")
     return int(ExitCode.OK)

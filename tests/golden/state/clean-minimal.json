@@ -265,7 +265,8 @@
     "hypotheses": [],
     "remaining": [
       "Perform semantic analysis for applicable check categories",
-      "Perform runtime verification only where separately authorized"
+      "Perform runtime verification only where separately authorized",
+      "Use forensic mode if Git internals or provenance-heavy historical evidence are material to the review"
     ],
     "revalidation": [
       "Rebuild inventory and compare snapshot digest after source-byte or path changes"
@@ -306,7 +307,8 @@
     "discovered_artifact_count": 1,
     "discovery_complete": true,
     "limits": [
-      "Semantic analysis has not been performed by deterministic Scan Core"
+      "Semantic analysis has not been performed by deterministic Scan Core",
+      "Whole-project mode: inspect safely readable project content broadly; Git internal storage is excluded from ordinary artifact analysis and represented as repository provenance."
     ],
     "methods": [
       "filesystem metadata inventory",
@@ -315,7 +317,7 @@
     ],
     "redacted_artifact_count": 0,
     "resource_limits_hit": [],
-    "sampling": "No intentional sampling; reads are bounded by configured resource ceilings",
+    "sampling": "No intentional first-party sampling; reads are bounded by configured resource ceilings, with Git internal storage represented separately from ordinary project artifacts.",
     "sensitive_omissions": [],
     "snapshot_consistency": "Snapshot digest is derived from a canonically ordered normalized manifest",
     "unreadable_artifact_count": 0
@@ -351,6 +353,14 @@
       "sensitive_paths_omitted": 0
     },
     "privacy_execution": "Deterministic privacy assessment completed; raw matched sensitive values are not stored in canonical state",
+    "scan_mode": {
+      "coverage_contract": "Whole-project mode: inspect safely readable project content broadly; Git internal storage is excluded from ordinary artifact analysis and represented as repository provenance.",
+      "deeper_mode": "forensic",
+      "mode_exclusions": [
+        ".git/**"
+      ],
+      "name": "deep"
+    },
     "snapshot_identity_complete": true,
     "tool_owned_omissions": []
   },
@@ -365,7 +375,9 @@
   },
   "project": {
     "critical_artifact_ids": [],
-    "exclusions": [],
+    "exclusions": [
+      "scan mode deep: .git/**"
+    ],
     "name": "project",
     "purpose": "Establish a deterministic static inventory and snapshot baseline",
     "scope": "Project-local filesystem tree rooted at the declared scan path",
@@ -381,7 +393,16 @@
     ]
   },
   "provenance": {
-    "configuration_digest": "sha256:ca4e15769a0ef4917e4a140e0f275cac0c94514384ac9adc46a6de280ab19166",
+    "configuration_digest": "sha256:c111017604be67660a7cadaeaffb9704b840bcc68c3ebf8a78547ccdda10bd1e",
+    "git": {
+      "branch": null,
+      "commit": null,
+      "detected": false,
+      "head": null,
+      "limitations": [],
+      "remotes": [],
+      "working_tree_status": "not_assessed"
+    },
     "root_identity": "root:7bc401ba9fac844bfc9a59a7",
     "snapshot_digest": "sha256:02b420d2396c3586b0e8eecab4bcd4b3843dbff90dda5152ec7c2990457e1c22",
     "state_digest_algorithm": "sha256",
@@ -399,6 +420,7 @@
     "mode": "static",
     "network_used": false,
     "scan_id": "<volatile-run-id>",
+    "scan_mode": "deep",
     "scan_version": "0.3.0.dev1",
     "started_at": "<volatile-time>",
     "target_executed": false

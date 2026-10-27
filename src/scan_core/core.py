@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 from .config import ScanConfig, ScanResult
+from .git_provenance import inspect_git_provenance
 from .inventory import build_inventory
 from .privacy import assess_privacy
 from .render import render_report
@@ -66,6 +67,7 @@ def scan_project(config: ScanConfig) -> ScanResult:
     started_at = _utc_now()
     root = Path(config.root).resolve(strict=True)
     tool_owned_omissions = _prepare_output_omissions(config, root)
+    git_provenance = inspect_git_provenance(root)
     inventory = build_inventory(config, _internal_ignores=tool_owned_omissions)
     snapshot = build_snapshot(inventory)
     privacy = assess_privacy(config, inventory)
@@ -75,6 +77,7 @@ def scan_project(config: ScanConfig) -> ScanResult:
         inventory,
         snapshot,
         privacy=privacy,
+        git_provenance=git_provenance,
         started_at=started_at,
         completed_at=completed_at,
     )

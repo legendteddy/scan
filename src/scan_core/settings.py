@@ -18,6 +18,7 @@ from .errors import CommandError
 class ProjectSettings:
     privacy_mode: str = "offline"
     redaction_level: str = "standard"
+    scan_mode: str = "deep"
     excludes: tuple[str, ...] = ()
     sensitive_paths: tuple[str, ...] = ()
     max_file_bytes: int = 5_000_000
@@ -28,6 +29,7 @@ class ProjectSettings:
 _ALLOWED_SCAN = {
     "privacy",
     "redact",
+    "mode",
     "max_file_bytes",
     "max_total_bytes",
     "follow_internal_links",
@@ -36,6 +38,7 @@ _ALLOWED_SCAN = {
 _ALLOWED_TOP = {"scan", "exclude"}
 _ALLOWED_PRIVACY = {"offline", "local", "controlled-remote"}
 _ALLOWED_REDACTION = {"none", "standard", "strict"}
+_ALLOWED_MODES = {"quick", "deep", "forensic"}
 
 
 def _string_list(value: Any, label: str) -> tuple[str, ...]:
@@ -78,6 +81,7 @@ def load_project_settings(root: str | Path) -> ProjectSettings:
 
     privacy = scan.get("privacy", "offline")
     redact = scan.get("redact", "standard")
+    mode = scan.get("mode", "deep")
     max_file = scan.get("max_file_bytes", 5_000_000)
     max_total = scan.get("max_total_bytes", 250_000_000)
     follow = scan.get("follow_internal_links", False)
@@ -88,6 +92,8 @@ def load_project_settings(root: str | Path) -> ProjectSettings:
         raise CommandError("scan.privacy must be offline, local, or controlled-remote")
     if redact not in _ALLOWED_REDACTION:
         raise CommandError("scan.redact must be none, standard, or strict")
+    if mode not in _ALLOWED_MODES:
+        raise CommandError("scan.mode must be quick, deep, or forensic")
     if type(max_file) is not int or max_file < 0:
         raise CommandError("scan.max_file_bytes must be a non-negative integer")
     if type(max_total) is not int or max_total < 0:
@@ -98,6 +104,7 @@ def load_project_settings(root: str | Path) -> ProjectSettings:
     return ProjectSettings(
         privacy_mode=privacy,
         redaction_level=redact,
+        scan_mode=mode,
         excludes=_string_list(patterns, "exclude.patterns"),
         sensitive_paths=_string_list(sensitive, "scan.sensitive_paths"),
         max_file_bytes=max_file,
