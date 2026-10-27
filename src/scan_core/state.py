@@ -1,0 +1,336 @@
+"""Canonical Scan state 1.3 construction and deterministic serialization."""
+
+from __future__ import annotations
+
+from collections import Counter
+from datetime import datetime, timezone
+import hashlib
+import json
+import mimetypes
+from pathlib import Path
+from typing import Any
+
+from .config import ScanConfig
+from .inventory import InventoryArtifact, InventoryResult
+from .snapshot import Snapshot
+from .validate import CHECK_CATEGORIES
+from .version import __version__
+
+SCHEMA_VERSION = "1.3"
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _canonical_bytes(value: Any) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8", errors="surrogatepass")
+
+
+def _sha256_json(value: Any) -> str:
+    return "sha256:" + hashlib.sha256(_canonical_bytes(value)).hexdigest()
+
+
+def canonical_state_json(state: dict[str, Any]) -> str:
+    """Serialize state deterministically without losing Unicode path names."""
+    return _canonical_bytes(state).decode("utf-8", errors="surrogatepass")
+
+
+def configuration_digest(config: ScanConfig) -> str:
+    """Digest behavior-affecting configuration, excluding output destinations."""
+    payload = {
+        "privacy_mode": config.privacy_mode,
+        "redaction_level": config.redaction_level,
+        "excludes": sorted(pattern.replace("\\", "/") for pattern in config.excludes),
+        "max_file_bytes": config.max_file_bytes,
+        "max_total_bytes": config.max_total_bytes,
+        "follow_internal_links": config.follow_internal_links,
+    }
+    return _sha256_json(payload)
+
+
+def _artifact_source_digest(artifact: InventoryArtifact) -> str:
+    if artifact.content_identity.startswith("sha256:"):
+        return artifact.content_identity
+    return _sha256_json({
+        "locator": artifact.locator,
+        "path_kind": artifact.path_kind,
+        "size_bytes": artifact.size_bytes,
+        "content_identity": artifact.content_identity,
+        "symlink_scope": artifact.symlink_scope,
+        "excluded": artifact.excluded,
+    })
+
+
+def _evidence_id(artifact_id: str) -> str:
+    digest = hashlib.sha256(("inventory:" + artifact_id).encode("utf-8")).hexdigest()
+    return "evidence:" + digest[:20]
+
+
+def _media_type(artifact: InventoryArtifact) -> str:
+    if artifact.path_kind != "file":
+        return "inode/" + artifact.path_kind
+    guessed, _encoding = mimetypes.guess_type(artifact.locator, strict=False)
+    return guessed or "application/octet-stream"
+
+
+def _artifact_status(artifact: InventoryArtifact) -> tuple[str, str, str, str | None]:
+    """Map deterministic inventory depth to honest Scan coverage semantics."""
+    if artifact.excluded:
+        return "excluded", "fresh", artifact.reason or "excluded by configuration", "fresh"
+    if artifact.content_identity.startswith("unreadable:"):
+        return "unreadable", "none", artifact.reason or "artifact could not be read", None
+    if artifact.path_kind == "file" and artifact.content_identity.startswith("sha256:"):
+        return "content_read", "fresh", "bytes hashed; semantic behavior not analyzed", "fresh"
+    if artifact.path_kind == "file" and artifact.content_identity.startswith("unhashed:"):
+        return "partial", "fresh", artifact.reason or "metadata read but content identity incomplete", "fresh"
+    if artifact.path_kind in {"directory", "symlink", "special", "unknown"}:
+        return "metadata_only", "fresh", artifact.reason or "filesystem metadata inventoried", "fresh"
+    return "discovered", "none", artifact.reason or "artifact discovered", None
+
+
+def _artifact_evidence(artifact: InventoryArtifact, inspected_at: str) -> dict[str, Any] | None:
+    status, origin, reason, _ = _artifact_status(artifact)
+    if origin == "none":
+        return None
+    result = {
+        "path_kind": artifact.path_kind,
+        "size_bytes": artifact.size_bytes,
+        "content_identity": artifact.content_identity,
+        "symlink_scope": artifact.symlink_scope,
+        "excluded": artifact.excluded,
+    }
+    return {
+        "id": _evidence_id(artifact.id),
+        "artifact_id": artifact.id,
+        "locator": artifact.locator,
+        "kind": "static",
+        "claim": "Scan Core deterministically inventoried this artifact",
+        "result": json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+        "method": "read-only filesystem metadata inventory and bounded SHA-256 hashing",
+        "time": inspected_at,
+        "limitations": reason,
+        "inspection_origin": "fresh",
+        "producer": {"kind": "scan-core", "name": "scan-core", "version": __version__},
+        "source_digest": _artifact_source_digest(artifact),
+    }
+
+
+def _check_rows(artifact_ids: list[str], evidence_ids: list[str], inventory_complete: bool) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for category in CHECK_CATEGORIES:
+        if category == "inventory_and_provenance":
+            if not evidence_ids:
+                status = "not_assessed"
+                verification_state = "unverified"
+                result = "No artifact evidence rows exist in the declared scope"
+                next_step = "Add or authorize at least one in-scope artifact, then rerun inventory/provenance assessment"
+            else:
+                status = "assessed" if inventory_complete else "partial"
+                verification_state = "static"
+                result = (
+                    "Inventory and content identities were established within configured limits"
+                    if inventory_complete
+                    else "Inventory/provenance is partial because one or more identities or reads were incomplete"
+                )
+                next_step = None if inventory_complete else "Resolve unreadable/resource-limited artifacts and rerun"
+            rows.append({
+                "id": "check-" + category,
+                "category": category,
+                "title": "Inventory and provenance",
+                "status": status,
+                "scope": "Declared local project scope",
+                "method": "Deterministic Scan Core inventory and snapshot construction",
+                "artifact_ids": artifact_ids,
+                "evidence_ids": evidence_ids,
+                "related_ids": [],
+                "verification_state": verification_state,
+                "result": result,
+                "limitations": "This check does not establish semantic correctness or runtime behavior",
+                "reason": "Scan Core performs deterministic inventory as part of the v0.2 baseline",
+                "next_step": next_step,
+            })
+        else:
+            rows.append({
+                "id": "check-" + category,
+                "category": category,
+                "title": category.replace("_", " "),
+                "status": "not_assessed",
+                "scope": "Declared local project scope",
+                "method": "Not performed by deterministic Scan Core state construction",
+                "artifact_ids": [],
+                "evidence_ids": [],
+                "related_ids": [],
+                "verification_state": "unverified",
+                "result": "No assessment result is available",
+                "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
+                "reason": "Slice 3 establishes canonical state but does not add semantic analyzers",
+                "next_step": "Perform this check using an authorized analyzer and attach evidence",
+            })
+    return rows
+
+
+def build_state(
+    config: ScanConfig,
+    inventory: InventoryResult,
+    snapshot: Snapshot,
+    *,
+    started_at: str | None = None,
+    completed_at: str | None = None,
+) -> dict[str, Any]:
+    """Build canonical Scan 1.3 state from deterministic inventory and snapshot data."""
+    started = started_at or _utc_now()
+    completed = completed_at or started
+    config_digest = configuration_digest(config)
+    scan_id_seed = {"snapshot": snapshot.digest, "config": config_digest, "started_at": started}
+    scan_id = "scan:" + hashlib.sha256(_canonical_bytes(scan_id_seed)).hexdigest()[:24]
+
+    artifacts: list[dict[str, Any]] = []
+    evidence: list[dict[str, Any]] = []
+    for item in inventory.artifacts:
+        status, origin, reason, inspected_origin = _artifact_status(item)
+        evidence_row = _artifact_evidence(item, completed)
+        evidence_ids = [evidence_row["id"]] if evidence_row is not None else []
+        if evidence_row is not None:
+            evidence.append(evidence_row)
+        artifacts.append({
+            "id": item.id,
+            "locator": item.locator,
+            "type": item.path_kind,
+            "status": status,
+            "reason": reason,
+            "evidence_ids": evidence_ids,
+            "inspection_origin": origin,
+            "inspected_at": completed if inspected_origin is not None else None,
+            "content_identity": item.content_identity,
+            "size_bytes": item.size_bytes,
+            "media_type": _media_type(item),
+            "path_kind": item.path_kind,
+            "redaction_state": "none",
+        })
+
+    artifact_ids = [item["id"] for item in artifacts]
+    evidence_ids = [item["id"] for item in evidence]
+    checks = _check_rows(artifact_ids, evidence_ids, inventory.complete)
+    counts_by_status = dict(Counter(item["status"] for item in artifacts))
+    counts_by_check_status = dict(Counter(item["status"] for item in checks))
+    unreadable_count = counts_by_status.get("unreadable", 0)
+
+    limits = ["Semantic analysis has not been performed by deterministic Scan Core"]
+    limits.extend(inventory.resource_limits_hit)
+    limits.extend(inventory.warnings)
+    remaining = [
+        "Perform semantic analysis for applicable check categories",
+        "Perform runtime verification only where separately authorized",
+    ]
+    if not inventory.complete:
+        remaining.insert(0, "Resolve incomplete inventory/content identity boundaries and rerun")
+
+    project_name = inventory.root.name or "project"
+    state: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "run": {
+            "scan_id": scan_id,
+            "scan_version": __version__,
+            "started_at": started,
+            "completed_at": completed,
+            "mode": "static",
+            "target_executed": False,
+            "network_used": False,
+        },
+        "privacy": {
+            "mode": config.privacy_mode,
+            "redaction_level": config.redaction_level,
+            "redaction_count": 0,
+            "sensitive_path_count": 0,
+            "egress_performed": False,
+            "egress_bytes": 0,
+        },
+        "provenance": {
+            "root_identity": "root:" + hashlib.sha256(snapshot.digest.encode("ascii")).hexdigest()[:24],
+            "snapshot_digest": snapshot.digest,
+            "state_digest_algorithm": "sha256",
+            "tool_versions": [{"kind": "scan-core", "name": "scan-core", "version": __version__}],
+            "configuration_digest": config_digest,
+        },
+        "project": {
+            "name": project_name,
+            "purpose": "Establish a deterministic static inventory and snapshot baseline",
+            "target_types": ["local_directory"],
+            "source_locators": ["."],
+            "snapshot": {"identity": snapshot.digest, "time": completed},
+            "scope": "Project-local filesystem tree rooted at the declared scan path",
+            "exclusions": list(config.excludes) + [
+                "tool-owned output: " + pattern for pattern in inventory.tool_owned_omissions
+            ],
+            "critical_artifact_ids": [],
+        },
+        "summary": {
+            "overview": "Deterministic inventory and provenance baseline created without executing target code",
+            "operation": "Read filesystem metadata and hash eligible file bytes within configured ceilings",
+            "condition": "Inventory baseline available; semantic analysis and runtime verification remain incomplete",
+            "strengths": ["Artifact IDs and snapshot identity are deterministic for unchanged normalized input"],
+            "priorities": ["Continue with evidence-backed semantic checks rather than inferring correctness from hashing"],
+            "readiness": "not established",
+            "evidence_ids": evidence_ids,
+            "limitations": "Hashing and metadata inspection do not prove correctness, security, test status, deployment state or runtime behavior",
+        },
+        "coverage": {
+            "discovery_complete": inventory.discovery_complete,
+            "analysis_complete": False,
+            "discovered_artifact_count": len(artifacts),
+            "counts_by_status": counts_by_status,
+            "counts_by_check_status": counts_by_check_status,
+            "checks_complete": False,
+            "limits": limits,
+            "sampling": "No intentional sampling; reads are bounded by configured resource ceilings",
+            "methods": ["filesystem metadata inventory", "bounded SHA-256 hashing", "canonical snapshot manifest"],
+            "checks_performed": ["inventory_and_provenance"],
+            "checks_not_performed": [c for c in CHECK_CATEGORIES if c != "inventory_and_provenance"],
+            "snapshot_consistency": "Snapshot digest is derived from a canonically ordered normalized manifest",
+            "sensitive_omissions": [],
+            "resource_limits_hit": list(inventory.resource_limits_hit),
+            "unreadable_artifact_count": unreadable_count,
+            "redacted_artifact_count": 0,
+        },
+        "continuation": {
+            "completed": ["Deterministic inventory", "Snapshot identity", "Canonical Scan 1.3 state construction"],
+            "remaining": remaining,
+            "hypotheses": [],
+            "decisions": ["Target code was not executed", "No network operation was performed"],
+            "revalidation": ["Rebuild inventory and compare snapshot digest after source-byte or path changes"],
+            "source_needs": ["Original project bytes are required for deeper semantic continuation"],
+            "authorization_note": "This state does not authorize target execution, modification or network egress",
+        },
+        "artifacts": artifacts,
+        "components": [],
+        "relationships": [],
+        "evidence": evidence,
+        "checks": checks,
+        "findings": [],
+        "controls": [],
+        "unknowns": [{
+            "id": "unknown:semantic-runtime",
+            "question": "What semantic behavior, correctness, security and runtime properties do these artifacts have?",
+            "artifact_ids": [],
+            "evidence_ids": [],
+            "reason": "Deterministic inventory and hashing do not answer semantic or runtime questions",
+            "impact": "Project readiness cannot be established from this state alone",
+            "next_safe_step": "Perform authorized semantic checks and runtime verification where appropriate",
+        }],
+        "actions": [],
+        "extensions": {
+            "critical_artifact_selection": "Not determined by deterministic inventory; semantic selection is required",
+            "privacy_execution": "Slice 3 records the requested privacy/redaction mode but embeds no source excerpts; deterministic redaction execution lands separately",
+            "tool_owned_omissions": list(inventory.tool_owned_omissions),
+            "snapshot_identity_complete": snapshot.identity_complete,
+            "inventory_total_hashed_bytes": inventory.total_hashed_bytes,
+        },
+    }
+    return state

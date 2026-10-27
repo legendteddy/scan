@@ -38,6 +38,7 @@ class InventoryResult:
     total_hashed_bytes: int
     resource_limits_hit: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
+    tool_owned_omissions: tuple[str, ...] = ()
 
     @property
     def complete(self) -> bool:
@@ -90,8 +91,13 @@ def _symlink_scope(root: Path, path: Path) -> tuple[str, Path | None]:
     return "internal", resolved
 
 
-def build_inventory(config: ScanConfig) -> InventoryResult:
-    """Inventory a directory deterministically without executing target content."""
+def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = ()) -> InventoryResult:
+    """Inventory a directory deterministically without executing target content.
+
+    ``_internal_ignores`` is reserved for Scan-owned output paths so repeat scans do
+    not recursively ingest their own generated state/report files. Those omissions
+    are returned in ``tool_owned_omissions`` and remain explicit in canonical state.
+    """
     root_input = Path(config.root)
     if not root_input.exists():
         raise SourceError(f"Source path does not exist: {root_input}")
@@ -137,6 +143,8 @@ def build_inventory(config: ScanConfig) -> InventoryResult:
                 warnings.append(str(error))
                 continue
 
+            if _is_excluded(locator, _internal_ignores):
+                continue
             excluded = _is_excluded(locator, config.excludes)
             try:
                 metadata = path.lstat()
@@ -276,4 +284,5 @@ def build_inventory(config: ScanConfig) -> InventoryResult:
         total_hashed_bytes=total_hashed,
         resource_limits_hit=tuple(sorted(limits)),
         warnings=tuple(warnings),
+        tool_owned_omissions=tuple(sorted(set(_internal_ignores))),
     )

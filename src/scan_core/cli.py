@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 from typing import Sequence
 
-from . import __version__
+from .config import ScanConfig
+from .core import scan_project
+from .version import __version__
 from .errors import (
     CommandError,
     CoverageThresholdError,
@@ -72,7 +75,38 @@ def _run_primary(argv: Sequence[str]) -> int:
     root = Path(args.path)
     if not root.exists():
         raise SourceError(f"Source path does not exist: {root}")
-    raise CommandError("Project report generation is not available until the canonical state builder lands in Slice 3")
+    if not args.no_html:
+        raise CommandError("HTML rendering lands in Slice 5; use --no-html for canonical state output in Slice 3")
+
+    config = ScanConfig(
+        root=root,
+        output_state=args.state,
+        output_html=None,
+        privacy_mode=args.privacy,
+        redaction_level=args.redact,
+        excludes=tuple(args.exclude),
+        max_file_bytes=args.max_file_bytes,
+        max_total_bytes=args.max_total_bytes,
+        follow_internal_links=args.follow_internal_links,
+    )
+    result = scan_project(config)
+    summary = {
+        "schema_version": result.state["schema_version"],
+        "scan_id": result.state["run"]["scan_id"],
+        "snapshot_digest": result.state["provenance"]["snapshot_digest"],
+        "artifact_count": result.state["coverage"]["discovered_artifact_count"],
+        "completion": result.completion,
+        "state_path": str(result.state_path) if result.state_path is not None else None,
+    }
+    if args.json:
+        print(json.dumps(summary, sort_keys=True, separators=(",", ":")))
+    elif not args.quiet:
+        print(f"Scan state {summary['schema_version']} written to {summary['state_path']}")
+        print(f"Snapshot: {summary['snapshot_digest']}")
+        print(f"Artifacts: {summary['artifact_count']} | completion: {summary['completion']}")
+    if args.fail_on == "PARTIAL" and result.completion != "complete":
+        raise CoverageThresholdError("scan completed but the requested PARTIAL threshold was not met")
+    return int(ExitCode.OK)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
