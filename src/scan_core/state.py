@@ -158,6 +158,14 @@ def _artifact_evidence(
         "inspection_origin": "fresh",
         "producer": {"kind": "scan-core", "name": "scan-core", "version": __version__},
         "source_digest": _artifact_source_digest(artifact),
+        "freshness": {
+            "status": "fresh",
+            "source_state_digest": None,
+            "source_evidence_id": None,
+            "original_observed_at": inspected_at,
+            "reused_at": None,
+            "reuse_reason": None,
+        },
     }
 
 

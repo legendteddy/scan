@@ -45,6 +45,11 @@ def _normalize_golden_state(state):
             row["inspected_at"] = "<volatile-time>"
     for row in value["evidence"]:
         row["time"] = "<volatile-time>"
+        freshness = row.get("freshness")
+        if isinstance(freshness, dict):
+            freshness["original_observed_at"] = "<volatile-time>"
+            if freshness.get("reused_at") is not None:
+                freshness["reused_at"] = "<volatile-time>"
     return value
 
 
