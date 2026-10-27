@@ -1,0 +1,6 @@
+[project]
+name = "pocket-ledger-scan-fixture"
+version = "0.0.0"
+description = "Synthetic Scan demonstration; not a distributed package"
+requires-python = ">=3.9"
+dependencies = []

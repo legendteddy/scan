@@ -1,0 +1,54 @@
+<!-- Trusted markup examples for report-shell.html slots. Fill with escaped text;
+     do not ship placeholders or embed this entire catalogue as report content. -->
+
+<!-- METRIC_CARDS_HTML: label, value and note use three separate blocks. -->
+<article class="metric">
+  <span>{{FACT_LABEL}}</span>
+  <b>{{FACT_VALUE}}</b>
+  <small>{{FACT_CONTEXT}}</small>
+</article>
+<!-- For a long hash/identifier, use <b class="metric-code">{{SHORT_IDENTIFIER}}</b>.
+     Put its complete identity in snapshot metadata and structured state. -->
+
+<!-- CONTROL_CARDS_HTML: the whole card flows vertically, including status. -->
+<article class="control">
+  <span class="control-state">{{VERIFICATION_LABEL}}</span>
+  <h3>{{CONTROL_DESCRIPTION}}</h3>
+  <p>{{CONTROL_LIMITATIONS}}</p>
+  <span class="evidence-ref">{{EVIDENCE_LOCATORS}}</span>
+</article>
+
+<!-- VERDICT_PILLS_HTML -->
+<span class="verdict-pill">{{SUPPORTED_STATUS}}</span>
+
+<!-- PRIORITY_FINDING_CARDS_HTML / UNKNOWN_CARDS_HTML -->
+<article class="finding">
+  <div class="finding-top"><span class="severity">{{SEVERITY}}</span><span class="confidence">{{CONFIDENCE}}</span></div>
+  <h3>{{PLAIN_LANGUAGE_TITLE}}</h3>
+  <p>{{IMPACT_AND_UNCERTAINTY}}</p>
+  <span class="evidence-ref">{{EVIDENCE_LOCATORS}}</span>
+</article>
+
+<!-- ACTION_CARDS_HTML -->
+<article class="action">
+  <span class="action-no">{{NUMBER}}</span>
+  <h3>{{ACTION_TITLE}}</h3>
+  <p>{{ACTION_AND_VERIFICATION}}</p>
+</article>
+
+<!-- SEARCHABLE_EVIDENCE_AND_INVENTORY_HTML: wrap each table separately.
+     Use table-inventory and table-findings for those respective table types. -->
+<div class="table-scroll" tabindex="0" role="region" aria-label="Evidence table; scroll horizontally if needed">
+  <table class="table-evidence">
+    <thead><tr><th>ID</th><th>Kind</th><th>Locator</th><th>Result</th><th>Limits</th></tr></thead>
+    <tbody><tr><td><code>{{EVIDENCE_ID}}</code></td><td>{{KIND}}</td><td>{{LOCATOR}}</td><td>{{RESULT}}</td><td>{{LIMITS}}</td></tr></tbody>
+  </table>
+</div>
+
+<!-- CHECK_COVERAGE_MATRIX_HTML: one row per check; do not turn assessed into pass. -->
+<div class="table-scroll" tabindex="0" role="region" aria-label="Check coverage; scroll horizontally if needed">
+  <table class="table-checks">
+    <thead><tr><th>Check</th><th>Scope and method</th><th>Status</th><th>Result and limits</th><th>Evidence</th></tr></thead>
+    <tbody><tr><td>{{CHECK_TITLE}}</td><td>{{CHECK_SCOPE_AND_METHOD}}</td><td>{{CHECK_STATUS}}</td><td>{{CHECK_RESULT_AND_LIMITS}}</td><td>{{CHECK_EVIDENCE_LOCATORS}}</td></tr></tbody>
+  </table>
+</div>

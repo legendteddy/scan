@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+<title id="title">Scan — evidence-backed project inspection</title>
+<desc id="desc">Dark navy social preview with Scan positioning and an illustrative evidence dashboard.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#0e1425"/><stop offset=".58" stop-color="#171d3c"/><stop offset="1" stop-color="#252e5d"/></linearGradient>
+  <radialGradient id="glow"><stop stop-color="#6b75ff" stop-opacity=".58"/><stop offset="1" stop-color="#6b75ff" stop-opacity="0"/></radialGradient>
+  <linearGradient id="panel" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#263151"/><stop offset="1" stop-color="#151d33"/></linearGradient>
+  <linearGradient id="accent" x1="0" x2="1"><stop stop-color="#75c8ff"/><stop offset="1" stop-color="#9b8dff"/></linearGradient>
+  <filter id="shadow"><feDropShadow dx="0" dy="20" stdDeviation="30" flood-color="#030612" flood-opacity=".48"/></filter>
+</defs>
+<rect width="1280" height="640" fill="url(#bg)"/>
+<circle cx="1140" cy="30" r="480" fill="url(#glow)"/>
+<circle cx="80" cy="640" r="330" fill="url(#glow)" opacity=".24"/>
+<g stroke="#ffffff" stroke-opacity=".035"><path d="M0 80H1280M0 160H1280M0 240H1280M0 320H1280M0 400H1280M0 480H1280M0 560H1280M80 0V640M160 0V640M240 0V640M320 0V640M400 0V640M480 0V640M560 0V640M640 0V640M720 0V640M800 0V640M880 0V640M960 0V640M1040 0V640M1120 0V640M1200 0V640"/></g>
+<g transform="translate(76 70)">
+  <rect width="64" height="64" rx="20" fill="#ffffff" fill-opacity=".1" stroke="#a4c7ff" stroke-opacity=".4"/>
+  <circle cx="29" cy="29" r="13" fill="none" stroke="#8fd6ff" stroke-width="5"/>
+  <path d="M39 39l12 12" stroke="#8fd6ff" stroke-width="5" stroke-linecap="round"/>
+  <text x="84" y="44" fill="#ffffff" font-size="39" font-weight="750" font-family="Segoe UI,Arial,sans-serif" letter-spacing="5">SCAN</text>
+</g>
+<rect x="76" y="184" width="244" height="34" rx="17" fill="#92adff" fill-opacity=".14" stroke="#b1c8ff" stroke-opacity=".27"/>
+<text x="98" y="207" fill="#b9d6ff" font-size="15" font-weight="700" font-family="Segoe UI,Arial,sans-serif" letter-spacing="2">AI AGENT SKILL</text>
+<text x="76" y="304" fill="#ffffff" font-size="56" font-weight="740" font-family="Segoe UI,Arial,sans-serif">Whole-project</text>
+<text x="76" y="371" fill="#ffffff" font-size="56" font-weight="740" font-family="Segoe UI,Arial,sans-serif">inspection</text>
+<text x="76" y="438" fill="url(#accent)" font-size="56" font-weight="740" font-family="Segoe UI,Arial,sans-serif">with receipts.</text>
+<text x="78" y="502" fill="#c1cce3" font-size="23" font-family="Segoe UI,Arial,sans-serif">Coverage. Evidence. Honest unknowns.</text>
+<text x="78" y="563" fill="#8f9cb8" font-size="18" font-family="Segoe UI,Arial,sans-serif">Static-first  •  Self-contained HTML reports</text>
+<g transform="translate(736 114)" filter="url(#shadow)">
+  <rect width="476" height="416" rx="30" fill="url(#panel)" stroke="#9cb7ff" stroke-opacity=".28"/>
+  <rect x="26" y="24" width="424" height="48" rx="15" fill="#ffffff" fill-opacity=".07"/>
+  <circle cx="50" cy="48" r="7" fill="#81e7b1"/>
+  <text x="68" y="55" fill="#eaf0ff" font-size="18" font-weight="650" font-family="Segoe UI,Arial,sans-serif">Inspection evidence</text>
+  <text x="32" y="116" fill="#9eaed2" font-size="14" font-family="Segoe UI,Arial,sans-serif" letter-spacing="1">EXAMPLE REPORT</text>
+  <g transform="translate(26 136)">
+    <rect width="198" height="94" rx="17" fill="#ffffff" fill-opacity=".075"/>
+    <text x="20" y="29" fill="#b2bfd9" font-size="15" font-family="Segoe UI,Arial,sans-serif">Files accounted for</text>
+    <text x="20" y="73" fill="#ffffff" font-size="39" font-weight="700" font-family="Segoe UI,Arial,sans-serif">5 / 5</text>
+    <rect x="214" width="210" height="94" rx="17" fill="#ffffff" fill-opacity=".075"/>
+    <text x="232" y="29" fill="#b2bfd9" font-size="15" font-family="Segoe UI,Arial,sans-serif">Check categories</text>
+    <text x="232" y="73" fill="#ffffff" font-size="39" font-weight="700" font-family="Segoe UI,Arial,sans-serif">14</text>
+  </g>
+  <g transform="translate(26 251)">
+    <rect width="424" height="130" rx="18" fill="#ffffff" fill-opacity=".055" stroke="#ffffff" stroke-opacity=".06"/>
+    <text x="19" y="29" fill="#e8efff" font-size="16" font-weight="650" font-family="Segoe UI,Arial,sans-serif">Source-linked finding</text>
+    <text x="19" y="59" fill="#b7c5de" font-size="16" font-family="Segoe UI,Arial,sans-serif">Floating-point totals need verification</text>
+    <rect x="19" y="77" width="192" height="31" rx="9" fill="#8daaff" fill-opacity=".16"/>
+    <text x="31" y="98" fill="#9dd3ff" font-size="14" font-family="Consolas,monospace">ledger.py:6–9</text>
+    <circle cx="385" cy="89" r="13" fill="#e5b56b" fill-opacity=".25"/>
+    <path d="M385 81v9m0 6v1" stroke="#ffd494" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</g>
+</svg>

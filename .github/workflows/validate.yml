@@ -1,0 +1,37 @@
+name: Validate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python validator tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile validator and demo generator
+        run: python -m py_compile scripts/validate_report.py scripts/test_validate_report.py scripts/build_demo_report.py
+
+      - name: Run validator contract tests
+        run: python -B -m unittest discover -s scripts -p "test_*.py" -v
+
+      - name: Verify reproducible synthetic report
+        run: |
+          python -B scripts/build_demo_report.py --check
+          python -B scripts/validate_report.py examples/demo-report.html
+
+      - name: Run synthetic fixture unit tests
+        run: python -B -m unittest discover -s examples/demo-project/tests -p "test_*.py" -v

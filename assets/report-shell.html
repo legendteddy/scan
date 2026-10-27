@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>{{REPORT_TITLE}}</title>
+<style>
+:root{--bg:#f5f5f7;--ink:#17171a;--muted:#65656d;--line:rgba(25,25,30,.10);--card:rgba(255,255,255,.78);--white:#fff;--blue:#1677ff;--blue2:#6f61ff;--good:#18794e;--warn:#a15c00;--bad:#c33a3a;--shadow:0 24px 70px rgba(30,32,45,.08);--r:28px}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(900px 500px at 15% -10%,rgba(90,112,255,.16),transparent 60%),radial-gradient(800px 500px at 92% 5%,rgba(22,119,255,.10),transparent 58%),var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}.shell{width:min(1240px,calc(100% - 40px));margin:auto;padding:24px 0 80px}.hero{position:relative;overflow:hidden;min-height:520px;border-radius:38px;padding:58px;background:linear-gradient(135deg,#111319 0%,#1b2030 42%,#202853 100%);color:#fff;box-shadow:0 35px 90px rgba(12,18,45,.25)}.hero:before,.hero:after{content:"";position:absolute;border-radius:50%;filter:blur(2px);pointer-events:none}.hero:before{width:380px;height:380px;right:-80px;top:-120px;background:radial-gradient(circle at 35% 35%,rgba(160,151,255,.62),rgba(70,94,255,.08) 65%,transparent 72%)}.hero:after{width:500px;height:500px;right:80px;bottom:-330px;border:1px solid rgba(255,255,255,.12);box-shadow:0 0 0 60px rgba(255,255,255,.025),0 0 0 120px rgba(255,255,255,.018)}.eyebrow{display:flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.62)}.live-dot{width:8px;height:8px;border-radius:50%;background:#7affbe;box-shadow:0 0 22px #7affbe}.hero h1{position:relative;z-index:1;margin:42px 0 18px;max-width:900px;font-size:clamp(48px,7vw,86px);line-height:.98;letter-spacing:-.055em;font-weight:700}.hero-copy{position:relative;z-index:1;max-width:780px;font-size:19px;line-height:1.55;color:rgba(255,255,255,.72)}.verdict{position:relative;z-index:1;margin-top:44px;display:flex;gap:14px;flex-wrap:wrap}.verdict-pill{padding:12px 16px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.075);backdrop-filter:blur(18px);border-radius:999px;font-size:13px;color:rgba(255,255,255,.82)}.verdict-pill strong{color:#fff;margin-right:6px}.snapshot{position:absolute;right:38px;bottom:34px;z-index:1;text-align:right;color:rgba(255,255,255,.48);font-size:11px;line-height:1.7}.snapshot code{color:rgba(255,255,255,.72)}
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin:18px 0 74px}.metric{background:var(--card);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.8);box-shadow:var(--shadow);border-radius:22px;padding:22px;min-height:118px}.metric small{display:block;color:var(--muted);font-size:11px;margin-bottom:9px}.metric b{font-size:28px;letter-spacing:-.04em}.metric em{display:block;font-style:normal;color:var(--muted);font-size:11px;margin-top:7px}
+.section{margin:0 0 82px}.section-head{display:grid;grid-template-columns:220px 1fr;gap:34px;margin-bottom:28px;align-items:end}.section-kicker{font-size:11px;text-transform:uppercase;letter-spacing:.13em;color:var(--muted)}.section h2{margin:0;font-size:clamp(31px,4vw,50px);line-height:1.04;letter-spacing:-.045em}.section-intro{grid-column:2;color:var(--muted);max-width:800px;font-size:16px;line-height:1.6;margin:0}.status-banner{display:grid;grid-template-columns:auto 1fr;gap:18px;align-items:start;border-radius:var(--r);padding:28px;background:linear-gradient(135deg,rgba(25,119,255,.08),rgba(113,98,255,.06));border:1px solid rgba(70,90,255,.14);margin-bottom:18px}.status-icon{width:46px;height:46px;border-radius:15px;background:#fff;display:grid;place-items:center;box-shadow:0 10px 28px rgba(36,50,110,.09);font-size:20px}.status-banner h3{margin:1px 0 8px;font-size:18px}.status-banner p{margin:0;color:var(--muted);line-height:1.6}.finding-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.finding{background:var(--white);border:1px solid var(--line);border-radius:var(--r);padding:28px;box-shadow:0 12px 34px rgba(25,25,35,.035)}.finding-top{display:flex;gap:8px;align-items:center}.signal,.severity{font-size:10px;text-transform:uppercase;letter-spacing:.1em;padding:6px 9px;border-radius:999px;background:#f1f1f4;color:#5b5b65}.finding.problem .signal{background:#fff1ef;color:#a63a30}.finding.risk .signal{background:#fff5e6;color:#9b6008}.finding.unverified .signal{background:#eef3ff;color:#3f5fa8}.finding h3{font-size:21px;letter-spacing:-.025em;margin:18px 0 10px}.finding p{margin:0;color:var(--muted);line-height:1.68}.finding.medium{border-color:rgba(195,58,58,.16)}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px}.control{display:grid;grid-template-columns:50px 1fr;gap:14px;background:var(--card);border:1px solid rgba(255,255,255,.85);border-radius:24px;padding:24px;box-shadow:var(--shadow)}.control-index{width:38px;height:38px;border-radius:12px;background:#ebf7f0;color:var(--good);display:grid;place-items:center;font-size:11px;font-weight:700}.control h3{margin:2px 0 8px;font-size:17px}.control p{margin:0;color:var(--muted);font-size:13px;line-height:1.6}
+.system-map{background:#fff;border:1px solid var(--line);border-radius:34px;padding:36px;box-shadow:var(--shadow);overflow:hidden}.map-row{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:center;gap:18px}.map-top{grid-template-columns:1fr auto 1fr auto 1fr}.map-node{min-height:112px;border-radius:22px;padding:22px;background:linear-gradient(180deg,#fff,#fafafd);border:1px solid var(--line);display:flex;flex-direction:column;justify-content:center}.map-node b{font-size:17px;margin-bottom:6px}.map-node span{font-size:12px;color:var(--muted)}.map-node.owner,.map-node.ai{background:linear-gradient(145deg,#171a22,#252c43);color:#fff}.map-node.owner span,.map-node.ai span{color:rgba(255,255,255,.62)}.map-node.evidence{background:#fff8ee}.map-node.tests{background:#f0f7ff}.map-arrow,.map-spine{color:#a0a0ac;text-align:center;font-size:20px}.map-spine{padding:13px 0}
+.module-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:15px}.module{background:#fff;border:1px solid var(--line);border-radius:26px;padding:26px}.module-head{display:flex;align-items:center;gap:10px}.module-dot{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--blue2));box-shadow:0 0 0 5px rgba(70,100,255,.08)}.module h3{margin:0;font-size:19px;letter-spacing:-.02em}.purpose{color:var(--muted);min-height:44px}.module dl{margin:18px 0 0}.module dl div{display:grid;grid-template-columns:88px 1fr;gap:12px;padding:11px 0;border-top:1px solid var(--line)}.module dt{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#8a8a92}.module dd{margin:0;color:#55555d;font-size:12px;line-height:1.5}
+.coverage-card{background:#101217;color:#fff;border-radius:34px;padding:38px;box-shadow:0 30px 80px rgba(10,12,20,.18)}.coverage-row{display:grid;grid-template-columns:180px 1fr 110px;gap:22px;align-items:center;padding:18px 0;border-bottom:1px solid rgba(255,255,255,.09)}.coverage-row:last-child{border-bottom:0}.coverage-row span{font-size:13px;color:rgba(255,255,255,.68)}.bar{height:11px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden}.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#75a7ff,#9b8cff)}.coverage-row b{text-align:right;font-size:13px}.coverage-note{margin-top:22px;color:rgba(255,255,255,.56);font-size:12px;line-height:1.65}.coverage-note strong{color:#fff}
+.insights{display:grid;grid-template-columns:1fr 1fr;gap:15px}.insight{padding:28px;border-radius:26px;background:linear-gradient(145deg,#eef5ff,#f8f5ff);border:1px solid rgba(80,90,180,.1)}.insight span{font-size:10px;text-transform:uppercase;letter-spacing:.11em;color:#5867a3}.insight h3{font-size:20px;margin:14px 0 9px}.insight p{margin:0;color:#5d6070;line-height:1.65}
+.action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.action{position:relative;background:#fff;border:1px solid var(--line);border-radius:26px;padding:28px;min-height:230px}.action .num{font-size:54px;line-height:1;color:#ececf1;font-weight:700;letter-spacing:-.06em}.action h3{font-size:18px;margin:20px 0 10px}.action p{color:var(--muted);line-height:1.62;margin:0}.action code{display:block;margin-top:16px;padding:12px;background:#f6f6f8;border-radius:12px;font-size:11px;white-space:normal;color:#41414a}.footer{border-top:1px solid var(--line);padding:26px 4px 0;display:flex;justify-content:space-between;gap:30px;color:var(--muted);font-size:11px;line-height:1.6}.footer b{color:var(--ink)}
+@media(max-width:980px){.metrics{grid-template-columns:repeat(3,1fr)}.finding-grid,.controls,.module-grid,.insights{grid-template-columns:1fr}.map-row,.map-top{grid-template-columns:1fr}.map-arrow{transform:rotate(90deg)}.action-grid{grid-template-columns:1fr}.section-head{grid-template-columns:1fr}.section-intro{grid-column:1}.hero{padding:42px;min-height:500px}.snapshot{position:relative;right:auto;bottom:auto;text-align:left;margin-top:40px}.coverage-row{grid-template-columns:1fr}.coverage-row b{text-align:left}.footer{flex-direction:column}}
+@media(max-width:620px){.shell{width:min(100% - 20px,1240px);padding-top:10px}.hero{padding:30px 24px;border-radius:28px}.hero h1{font-size:48px;margin-top:34px}.hero-copy{font-size:16px}.metrics{grid-template-columns:1fr 1fr;margin-bottom:58px}.metric{min-height:102px;padding:18px}.section{margin-bottom:62px}.section h2{font-size:36px}.system-map,.coverage-card{padding:24px;border-radius:26px}.finding,.module,.control,.action{padding:22px;border-radius:22px}.map-node{min-height:96px}.module dl div{grid-template-columns:1fr}.footer{padding-bottom:30px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+/* Delivery hardening: preserve the dashboard style while supporting long content. */
+.snapshot{position:relative;right:auto;bottom:auto;text-align:left;margin-top:28px;overflow-wrap:anywhere}
+.hero{min-height:520px}.hero h1{overflow-wrap:anywhere}
+.metric b{font-size:clamp(20px,2.2vw,28px);overflow-wrap:anywhere}
+.section-intro,.finding p,.control p,.module dd,.insight p,.action p{overflow-wrap:anywhere}
+.evidence-ref{display:block;margin-top:14px;font-size:12px;color:#505866;line-height:1.6;overflow-wrap:anywhere}
+.coverage-note{color:rgba(255,255,255,.76)}
+.appendix{padding:28px;background:#fff;border:1px solid var(--line);border-radius:26px;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;line-height:1.6}
+th,td{text-align:left;vertical-align:top;padding:13px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+th{color:var(--muted);font-weight:600}a{color:#175dc3}a:focus-visible,button:focus-visible{outline:3px solid #175dc3;outline-offset:4px}
+@media print{body{background:#fff;color:#111}.shell{width:100%;padding:0}.hero{min-height:0;padding:28px;background:#182033!important;color:#fff;box-shadow:none}.hero h1{font-size:40px}.hero:before,.hero:after{display:none}.section{margin-bottom:30px}.section h2{font-size:28px}.metrics{grid-template-columns:repeat(3,1fr);margin-bottom:30px}.finding,.control,.module,.action,.insight,.metric,.map-node{break-inside:avoid;box-shadow:none}.system-map,.coverage-card{box-shadow:none}.coverage-card{background:#fff;color:#111;border:1px solid #ccc}.coverage-row span,.coverage-note,.coverage-note strong{color:#333}.section-head{grid-template-columns:140px 1fr;gap:16px}.section-intro{grid-column:2}.footer{display:block}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+/* Scan component contract: labels, values and prose must never share narrow grid tracks. */
+.metric{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0}
+.metric>span,.metric>small,.metric>b,.metric>strong,.metric>em{display:block;max-width:100%;margin:0}
+.metric>span,.metric>small,.metric>em{font-size:12px;line-height:1.45;color:var(--muted);font-style:normal}
+.metric>b,.metric>strong{font-size:clamp(20px,2.1vw,28px);line-height:1.18;letter-spacing:-.025em;word-break:normal;overflow-wrap:normal}
+.metric>.metric-code{font-size:18px;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.control{display:block;min-width:0}
+.control>h3,.control>div>h3{margin:14px 0 10px;line-height:1.4;word-break:normal;overflow-wrap:normal}
+.control p{line-height:1.65;word-break:normal;overflow-wrap:normal}
+.control-state{display:inline-block;max-width:100%;padding:6px 10px;border-radius:9px;background:#eef2f8;color:#42506a;font-size:11px;line-height:1.4;font-weight:600;letter-spacing:.01em;white-space:normal}
+.control-index{margin-bottom:12px}
+.verdict{gap:10px 12px}.verdict>span{display:inline-block;padding:10px 14px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(255,255,255,.07);font-size:13px;line-height:1.45}
+.action .action-no{display:block;font-size:54px;line-height:1;color:#8b8b99;font-weight:700;letter-spacing:-.06em}
+.finding-top{flex-wrap:wrap}.confidence{font-size:12px;color:var(--muted)}
+.section-intro,.finding p,.module dd,.insight p,.action p{word-break:normal;overflow-wrap:normal}
+.evidence-ref{word-break:normal;overflow-wrap:break-word}
+.table-scroll{max-width:100%;overflow-x:auto;margin:16px 0 28px;border-radius:12px}
+.table-scroll:focus-visible{outline:3px solid #175dc3;outline-offset:3px}
+.table-scroll table{min-width:850px;table-layout:auto;margin:0}
+th,td{word-break:normal;overflow-wrap:normal;hyphens:none}
+th{white-space:nowrap}td:first-child{min-width:115px}
+td code{font-size:11px;word-break:normal;overflow-wrap:break-word}
+.table-evidence th:nth-child(2),.table-evidence td:nth-child(2){min-width:95px;white-space:nowrap}
+.table-evidence th:nth-child(3),.table-evidence td:nth-child(3){min-width:165px}
+.table-inventory td:nth-child(2){min-width:230px;overflow-wrap:anywhere}
+.table-inventory td:nth-child(3){min-width:160px}
+.table-inventory td:nth-child(4){min-width:120px;white-space:nowrap}
+.table-findings td:nth-child(2),.table-findings td:nth-child(4),.table-findings td:nth-child(5){white-space:nowrap}
+@media(max-width:1250px) and (min-width:981px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:620px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric>b,.metric>strong{font-size:20px}.metric>.metric-code{font-size:15px}.table-scroll{margin:12px 0 20px}}
+@media(max-width:360px){.metrics{grid-template-columns:1fr}}
+@media print{.table-scroll{overflow:visible}.table-scroll table{min-width:0;width:100%;font-size:9px}th,td{padding:7px}td:first-child,.table-evidence td:nth-child(2),.table-evidence td:nth-child(3),.table-inventory td:nth-child(2),.table-inventory td:nth-child(3),.table-inventory td:nth-child(4){min-width:0}th,.table-evidence td:nth-child(2),.table-inventory td:nth-child(4),.table-findings td:nth-child(2),.table-findings td:nth-child(4),.table-findings td:nth-child(5){white-space:normal}thead{display:table-header-group}tr{break-inside:avoid}}
+</style>
+</head>
+<body>
+<!-- Copy this asset and fill all slots. Escape all visible text. Build trusted markup
+     for *_HTML slots from escaped data, never paste target-supplied markup.
+     Keep the visual foundation; adapt section titles/counts/content to the target.
+     Remove unused sections and any unsupported claims. No sample facts are supplied. -->
+<main class="shell">
+<header class="hero">
+  <div class="eyebrow">{{INSPECTION_LABEL}}</div>
+  <h1>{{PROJECT_NAME}}<br>Scan</h1>
+  <p class="hero-copy">{{PLAIN_LANGUAGE_PURPOSE}}</p>
+  <div class="verdict">{{VERDICT_PILLS_HTML}}</div>
+  <div class="snapshot">{{SNAPSHOT_HTML}}</div>
+</header>
+<section class="metrics" aria-label="Project facts">{{METRIC_CARDS_HTML}}</section>
+<section class="section" aria-labelledby="verdict-title">
+  <div class="section-head"><div class="section-kicker">01 · Current picture</div>
+    <h2 id="verdict-title">{{VERDICT_TITLE}}</h2><p class="section-intro">{{VERDICT_SCOPE_AND_LIMITS}}</p></div>
+  {{COVERAGE_STATUS_BANNER_HTML}}
+  <div class="finding-grid">{{PRIORITY_FINDING_CARDS_HTML}}</div>
+</section>
+<section class="section" aria-labelledby="anatomy-title">
+  <div class="section-head"><div class="section-kicker">02 · Anatomy</div>
+    <h2 id="anatomy-title">{{ANATOMY_TITLE}}</h2><p class="section-intro">{{ANATOMY_EXPLANATION}}</p></div>
+  <div class="system-map">{{EVIDENCED_SYSTEM_MAP_HTML}}</div>
+</section>
+<section class="section" aria-labelledby="strengths-title">
+  <div class="section-head"><div class="section-kicker">03 · Strengths</div>
+    <h2 id="strengths-title">{{STRENGTHS_TITLE}}</h2><p class="section-intro">{{CONTROL_VERIFICATION_LIMITS}}</p></div>
+  <div class="controls">{{CONTROL_CARDS_HTML}}</div>
+</section>
+<section class="section" aria-labelledby="parts-title">
+  <div class="section-head"><div class="section-kicker">04 · The parts</div>
+    <h2 id="parts-title">{{PARTS_TITLE}}</h2><p class="section-intro">{{PARTS_INTRO}}</p></div>
+  <div class="module-grid">{{COMPONENT_CARDS_HTML}}</div>
+</section>
+<section class="section" aria-labelledby="unknowns-title">
+  <div class="section-head"><div class="section-kicker">05 · Open questions</div>
+    <h2 id="unknowns-title">{{UNKNOWNS_TITLE}}</h2><p class="section-intro">{{UNKNOWNS_INTRO}}</p></div>
+  <div class="finding-grid">{{UNKNOWN_CARDS_HTML}}</div>
+</section>
+<section class="section" aria-labelledby="coverage-title">
+  <div class="section-head"><div class="section-kicker">06 · Coverage</div>
+    <h2 id="coverage-title">{{COVERAGE_TITLE}}</h2><p class="section-intro">{{DISCOVERY_VS_ANALYSIS}}</p></div>
+  <div class="coverage-card">{{COVERAGE_ROWS_HTML}}<p class="coverage-note">{{COVERAGE_DETAIL}}</p></div>
+</section>
+<!-- Insert relevant target-specific sections here using the same card/section patterns. -->
+{{TARGET_SPECIFIC_SECTIONS_HTML}}
+<section class="section" aria-labelledby="next-title">
+  <div class="section-head"><div class="section-kicker">Next steps</div>
+    <h2 id="next-title">{{NEXT_STEPS_TITLE}}</h2><p class="section-intro">{{NEXT_STEPS_INTRO}}</p></div>
+  <div class="action-grid">{{ACTION_CARDS_HTML}}</div>
+</section>
+<section class="section" aria-labelledby="checks-title">
+  <div class="section-head"><div class="section-kicker">Check coverage</div>
+    <h2 id="checks-title">What was checked</h2><p class="section-intro">{{CHECK_COVERAGE_INTRO}}</p></div>
+  <div class="appendix">{{CHECK_COVERAGE_MATRIX_HTML}}</div>
+</section>
+<section class="section" aria-labelledby="evidence-title">
+  <div class="section-head"><div class="section-kicker">Supporting detail</div>
+    <h2 id="evidence-title">Evidence and inventory</h2><p class="section-intro">{{APPENDIX_INTRO}}</p></div>
+  <div class="appendix">{{SEARCHABLE_EVIDENCE_AND_INVENTORY_HTML}}</div>
+</section>
+<footer class="footer"><div><b>Inspection boundary</b><br>{{INSPECTION_BOUNDARY}}</div>
+<div><b>AI continuation state</b><br>Scan schema 1.2 is embedded in the application/json block with ID <code>project-anatomy-state</code>. It preserves the documented snapshot; original source bytes may still be needed.</div></footer>
+</main>
+<script type="application/json" id="project-anatomy-state">{{STATE_JSON}}</script>
+</body>
+</html>
