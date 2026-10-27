@@ -12,6 +12,7 @@ from typing import Any
 
 from .config import ScanConfig
 from .inventory import InventoryArtifact, InventoryResult
+from .privacy import PrivacyAssessment, path_is_sensitive
 from .snapshot import Snapshot
 from .validate import CHECK_CATEGORIES
 from .version import __version__
@@ -48,11 +49,34 @@ def configuration_digest(config: ScanConfig) -> str:
         "privacy_mode": config.privacy_mode,
         "redaction_level": config.redaction_level,
         "excludes": sorted(pattern.replace("\\", "/") for pattern in config.excludes),
+        "sensitive_paths": sorted(pattern.replace("\\", "/") for pattern in config.sensitive_paths),
         "max_file_bytes": config.max_file_bytes,
         "max_total_bytes": config.max_total_bytes,
         "follow_internal_links": config.follow_internal_links,
     }
     return _sha256_json(payload)
+
+
+def _safe_config_path(value: str, config: ScanConfig) -> str:
+    normalized = value.replace("\\", "/")
+    if path_is_sensitive(normalized, config.sensitive_paths):
+        digest = hashlib.sha256(normalized.encode("utf-8", errors="surrogatepass")).hexdigest()[:20]
+        return f"[REDACTED:path-pattern]/{digest}"
+    return value
+
+
+def _privacy_safe_text(value: str, privacy: PrivacyAssessment | None) -> str:
+    if privacy is None:
+        return value
+    safe = value
+    sensitive_rows = sorted(
+        (row for row in privacy.artifacts if row.sensitive_path),
+        key=lambda row: len(row.locator),
+        reverse=True,
+    )
+    for row in sensitive_rows:
+        safe = safe.replace(row.locator, row.safe_locator)
+    return safe
 
 
 def _artifact_source_digest(artifact: InventoryArtifact) -> str:
@@ -95,7 +119,12 @@ def _artifact_status(artifact: InventoryArtifact) -> tuple[str, str, str, str | 
     return "discovered", "none", artifact.reason or "artifact discovered", None
 
 
-def _artifact_evidence(artifact: InventoryArtifact, inspected_at: str) -> dict[str, Any] | None:
+def _artifact_evidence(
+    artifact: InventoryArtifact,
+    inspected_at: str,
+    *,
+    locator: str | None = None,
+) -> dict[str, Any] | None:
     status, origin, reason, _ = _artifact_status(artifact)
     if origin == "none":
         return None
@@ -109,7 +138,7 @@ def _artifact_evidence(artifact: InventoryArtifact, inspected_at: str) -> dict[s
     return {
         "id": _evidence_id(artifact.id),
         "artifact_id": artifact.id,
-        "locator": artifact.locator,
+        "locator": locator or artifact.locator,
         "kind": "static",
         "claim": "Scan Core deterministically inventoried this artifact",
         "result": json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
@@ -170,7 +199,7 @@ def _check_rows(artifact_ids: list[str], evidence_ids: list[str], inventory_comp
                 "verification_state": "unverified",
                 "result": "No assessment result is available",
                 "limitations": "Requires an authorized semantic or runtime assessment appropriate to this category",
-                "reason": "Slice 3 establishes canonical state but does not add semantic analyzers",
+                "reason": "Deterministic Scan Core does not perform this semantic or runtime assessment",
                 "next_step": "Perform this check using an authorized analyzer and attach evidence",
             })
     return rows
@@ -181,6 +210,7 @@ def build_state(
     inventory: InventoryResult,
     snapshot: Snapshot,
     *,
+    privacy: PrivacyAssessment | None = None,
     started_at: str | None = None,
     completed_at: str | None = None,
 ) -> dict[str, Any]:
@@ -191,17 +221,22 @@ def build_state(
     scan_id_seed = {"snapshot": snapshot.digest, "config": config_digest, "started_at": started}
     scan_id = "scan:" + hashlib.sha256(_canonical_bytes(scan_id_seed)).hexdigest()[:24]
 
+    privacy_by_id = privacy.by_id() if privacy is not None else {}
     artifacts: list[dict[str, Any]] = []
     evidence: list[dict[str, Any]] = []
     for item in inventory.artifacts:
         status, origin, reason, inspected_origin = _artifact_status(item)
-        evidence_row = _artifact_evidence(item, completed)
+        privacy_row = privacy_by_id.get(item.id)
+        locator = privacy_row.safe_locator if privacy_row is not None else item.locator
+        redaction_state = privacy_row.redaction_state if privacy_row is not None else "none"
+        redaction_count = privacy_row.redaction_count if privacy_row is not None else 0
+        evidence_row = _artifact_evidence(item, completed, locator=locator)
         evidence_ids = [evidence_row["id"]] if evidence_row is not None else []
         if evidence_row is not None:
             evidence.append(evidence_row)
         artifacts.append({
             "id": item.id,
-            "locator": item.locator,
+            "locator": locator,
             "type": item.path_kind,
             "status": status,
             "reason": reason,
@@ -212,7 +247,8 @@ def build_state(
             "size_bytes": item.size_bytes,
             "media_type": _media_type(item),
             "path_kind": item.path_kind,
-            "redaction_state": "none",
+            "redaction_state": redaction_state,
+            "redaction_count": redaction_count,
         })
 
     artifact_ids = [item["id"] for item in artifacts]
@@ -221,10 +257,23 @@ def build_state(
     counts_by_status = dict(Counter(item["status"] for item in artifacts))
     counts_by_check_status = dict(Counter(item["status"] for item in checks))
     unreadable_count = counts_by_status.get("unreadable", 0)
+    redacted_artifact_count = sum(
+        1 for item in artifacts
+        if item["redaction_state"] in {"content_redacted", "path_redacted", "fully_omitted"}
+    )
+    privacy_redaction_count = privacy.redaction_count if privacy is not None else 0
+    sensitive_path_count = privacy.sensitive_path_count if privacy is not None else 0
+    sensitive_omissions = [
+        "sensitive artifact path omitted: " + row.artifact_id
+        for row in (privacy.artifacts if privacy is not None else ())
+        if row.sensitive_path
+    ]
 
     limits = ["Semantic analysis has not been performed by deterministic Scan Core"]
-    limits.extend(inventory.resource_limits_hit)
-    limits.extend(inventory.warnings)
+    limits.extend(_privacy_safe_text(value, privacy) for value in inventory.resource_limits_hit)
+    limits.extend(_privacy_safe_text(value, privacy) for value in inventory.warnings)
+    if privacy is not None:
+        limits.extend(_privacy_safe_text(value, privacy) for value in privacy.warnings)
     remaining = [
         "Perform semantic analysis for applicable check categories",
         "Perform runtime verification only where separately authorized",
@@ -247,8 +296,8 @@ def build_state(
         "privacy": {
             "mode": config.privacy_mode,
             "redaction_level": config.redaction_level,
-            "redaction_count": 0,
-            "sensitive_path_count": 0,
+            "redaction_count": privacy_redaction_count,
+            "sensitive_path_count": sensitive_path_count,
             "egress_performed": False,
             "egress_bytes": 0,
         },
@@ -266,8 +315,11 @@ def build_state(
             "source_locators": ["."],
             "snapshot": {"identity": snapshot.digest, "time": completed},
             "scope": "Project-local filesystem tree rooted at the declared scan path",
-            "exclusions": list(config.excludes) + [
-                "tool-owned output: " + pattern for pattern in inventory.tool_owned_omissions
+            "exclusions": [
+                _safe_config_path(pattern, config) for pattern in config.excludes
+            ] + [
+                "tool-owned output: " + _safe_config_path(pattern, config)
+                for pattern in inventory.tool_owned_omissions
             ],
             "critical_artifact_ids": [],
         },
@@ -294,10 +346,12 @@ def build_state(
             "checks_performed": ["inventory_and_provenance"],
             "checks_not_performed": [c for c in CHECK_CATEGORIES if c != "inventory_and_provenance"],
             "snapshot_consistency": "Snapshot digest is derived from a canonically ordered normalized manifest",
-            "sensitive_omissions": [],
-            "resource_limits_hit": list(inventory.resource_limits_hit),
+            "sensitive_omissions": sensitive_omissions,
+            "resource_limits_hit": [
+                _privacy_safe_text(value, privacy) for value in inventory.resource_limits_hit
+            ],
             "unreadable_artifact_count": unreadable_count,
-            "redacted_artifact_count": 0,
+            "redacted_artifact_count": redacted_artifact_count,
         },
         "continuation": {
             "completed": ["Deterministic inventory", "Snapshot identity", "Canonical Scan 1.3 state construction"],
@@ -327,8 +381,17 @@ def build_state(
         "actions": [],
         "extensions": {
             "critical_artifact_selection": "Not determined by deterministic inventory; semantic selection is required",
-            "privacy_execution": "Slice 3 records the requested privacy/redaction mode but embeds no source excerpts; deterministic redaction execution lands separately",
-            "tool_owned_omissions": list(inventory.tool_owned_omissions),
+            "privacy_execution": "Deterministic privacy assessment completed; raw matched sensitive values are not stored in canonical state",
+            "privacy_egress_preview": {
+                "files_selected": privacy.files_selected if privacy is not None else 0,
+                "bytes_selected": privacy.bytes_selected if privacy is not None else 0,
+                "files_omitted_by_policy": privacy.files_omitted_by_policy if privacy is not None else 0,
+                "sensitive_paths_omitted": privacy.sensitive_paths_omitted if privacy is not None else 0,
+                "network_action": "none",
+            },
+            "tool_owned_omissions": [
+                _safe_config_path(pattern, config) for pattern in inventory.tool_owned_omissions
+            ],
             "snapshot_identity_complete": snapshot.identity_complete,
             "inventory_total_hashed_bytes": inventory.total_hashed_bytes,
         },

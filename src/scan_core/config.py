@@ -20,6 +20,7 @@ class ScanConfig:
     privacy_mode: PrivacyMode = "offline"
     redaction_level: RedactionLevel = "standard"
     excludes: tuple[str, ...] = ()
+    sensitive_paths: tuple[str, ...] = ()
     max_file_bytes: int = 5_000_000
     max_total_bytes: int = 250_000_000
     follow_internal_links: bool = False

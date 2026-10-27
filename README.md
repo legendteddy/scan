@@ -42,9 +42,22 @@ Expected: the example report passes the structural contract, the generated HTML 
 
 The validator verifies schema, typed references, evidence origins and coverage accounting. A **PASS is not a factual audit, a runtime test or a security guarantee**.
 
+## Standalone alpha core
+
+Scan now includes an early standalone deterministic core in addition to the agent skill. The v0.2 development CLI can inventory a local project, create canonical Scan 1.3 JSON, validate it, enforce deterministic privacy/redaction metadata, and produce a no-network egress preview. HTML generation from the standalone CLI is not implemented yet.
+
+```bash
+python -m pip install .
+scan . --no-html --state .scan/state.json --privacy offline
+scan validate .scan/state.json
+scan egress . --privacy controlled-remote --redact strict --json
+```
+
+`scan egress` is preview-only: it reports selected/omitted files, selected bytes and redaction counts, and performs **no network action**. Use `--sensitive-path "pattern/**"` to keep declared path names out of canonical state and egress selection.
+
 ## Install as an agent skill
 
-Scan is an instruction-based skill, **not** a standalone one-command scanner. Copy or clone this repository into the skill directory used by your compatible agent, then ask the agent to inspect a target.
+Scan also remains an instruction-based agent skill. Copy or clone this repository into the skill directory used by your compatible agent, then ask the agent to inspect a target.
 
 For environments that discover user skills in \`~/.agents/skills/\`:
 

@@ -1,0 +1,3 @@
+﻿Contact: alice@example.test
+Phone: +673 812 3456
+account_number = BRN-001-9999

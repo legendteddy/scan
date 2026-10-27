@@ -327,6 +327,8 @@ def _validate_state_1_3(state):
             'project.snapshot identity must equal provenance.snapshot_digest')
 
     redacted_count = 0
+    redaction_matches = 0
+    sensitive_path_count = 0
     unreadable_count = 0
     for artifact in state['artifacts']:
         label = artifact['id'] + ': '
@@ -337,11 +339,24 @@ def _validate_state_1_3(state):
         require(string(artifact['media_type']), label + 'media_type must be nonempty')
         require(artifact['path_kind'] in PATH_KINDS, label + 'invalid path_kind')
         require(artifact['redaction_state'] in REDACTION_STATES, label + 'invalid redaction_state')
-        if artifact['redaction_state'] != 'none':
+        artifact_redaction_count = artifact.get('redaction_count', 0)
+        require(type(artifact_redaction_count) is int and artifact_redaction_count >= 0,
+                label + 'redaction_count must be a non-negative integer')
+        redaction_matches += artifact_redaction_count
+        if artifact['redaction_state'] in {'content_redacted', 'path_redacted', 'fully_omitted'}:
             redacted_count += 1
+        if artifact['redaction_state'] == 'content_redacted':
+            require(artifact_redaction_count > 0, label + 'content_redacted requires redaction_count > 0')
+        if artifact['redaction_state'] == 'none':
+            require(artifact_redaction_count == 0, label + 'unredacted artifact cannot record redaction matches')
+        if artifact['redaction_state'] in {'path_redacted', 'fully_omitted'}:
+            sensitive_path_count += 1
+            require(artifact['locator'].startswith('[REDACTED:path]/'),
+                    label + 'sensitive path state requires a redacted locator surrogate')
         if artifact['status'] == 'unreadable':
             unreadable_count += 1
 
+    artifact_rows = {artifact['id']: artifact for artifact in state['artifacts']}
     for evidence in state['evidence']:
         label = evidence['id'] + ': '
         require(isinstance(evidence.get('producer'), dict), label + 'producer must be an object')
@@ -350,6 +365,10 @@ def _validate_state_1_3(state):
             require(string(producer.get(key)), label + 'producer.' + key + ' must be nonempty')
         require(producer['kind'] in PRODUCER_KINDS, label + 'invalid producer.kind')
         _sha256(evidence.get('source_digest'), label + 'source_digest')
+        artifact = artifact_rows[evidence['artifact_id']]
+        if artifact['redaction_state'] in {'path_redacted', 'fully_omitted'}:
+            require(evidence['locator'] == artifact['locator'],
+                    label + 'evidence locator must use the artifact redacted locator surrogate')
 
     coverage = state['coverage']
     for key in ('resource_limits_hit', 'unreadable_artifact_count', 'redacted_artifact_count'):
@@ -363,8 +382,22 @@ def _validate_state_1_3(state):
     require(type(coverage['redacted_artifact_count']) is int and
             coverage['redacted_artifact_count'] == redacted_count,
             'coverage.redacted_artifact_count does not match artifacts')
-    require(privacy['redaction_count'] >= redacted_count,
-            'privacy.redaction_count cannot be lower than redacted artifact count')
+    require(privacy['redaction_count'] == redaction_matches,
+            'privacy.redaction_count does not match artifact redaction counts')
+    require(privacy['sensitive_path_count'] == sensitive_path_count,
+            'privacy.sensitive_path_count does not match redacted path artifacts')
+    require(len(coverage['sensitive_omissions']) >= sensitive_path_count,
+            'coverage.sensitive_omissions must account for sensitive path omissions')
+    preview = state.get('extensions', {}).get('privacy_egress_preview')
+    if preview is not None:
+        require(isinstance(preview, dict), 'extensions.privacy_egress_preview must be an object')
+        for key in ('files_selected', 'bytes_selected', 'files_omitted_by_policy', 'sensitive_paths_omitted'):
+            require(type(preview.get(key)) is int and preview[key] >= 0,
+                    'privacy_egress_preview.' + key + ' must be a non-negative integer')
+        require(preview.get('network_action') == 'none',
+                'privacy_egress_preview.network_action must be none in v0.2')
+        require(preview['sensitive_paths_omitted'] == privacy['sensitive_path_count'],
+                'privacy_egress_preview sensitive path count mismatch')
     if coverage['resource_limits_hit']:
         require(coverage['analysis_complete'] is False,
                 'resource limits prevent complete analysis')

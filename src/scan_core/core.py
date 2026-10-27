@@ -1,4 +1,4 @@
-"""Top-level deterministic Scan Core orchestration for v0.2 Slice 3."""
+"""Top-level deterministic Scan Core orchestration for v0.2."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from pathlib import Path, PurePosixPath
 from .config import ScanConfig, ScanResult
 from .errors import CommandError
 from .inventory import build_inventory
+from .privacy import assess_privacy
 from .snapshot import build_snapshot
 from .state import build_state, canonical_state_json
 from .validate import validate_state
@@ -63,23 +64,25 @@ def _prepare_output_omissions(config: ScanConfig, root: Path) -> tuple[str, ...]
 def scan_project(config: ScanConfig) -> ScanResult:
     """Build deterministic inventory, snapshot and canonical Scan 1.3 JSON state.
 
-    Slice 3 intentionally does not render HTML. Callers requesting HTML receive a
-    clear command error rather than a placeholder report that could be mistaken for
+    The current standalone core does not render HTML. Callers requesting HTML receive
+    a clear command error rather than a placeholder report that could be mistaken for
     a complete v0.2 output.
     """
     if config.output_html is not None:
-        raise CommandError("HTML report rendering lands in Slice 5; request state-only output for Slice 3")
+        raise CommandError("HTML report rendering is not implemented yet; request state-only output")
 
     started_at = _utc_now()
     root = Path(config.root).resolve(strict=True)
     tool_owned_omissions = _prepare_output_omissions(config, root)
     inventory = build_inventory(config, _internal_ignores=tool_owned_omissions)
     snapshot = build_snapshot(inventory)
+    privacy = assess_privacy(config, inventory)
     completed_at = _utc_now()
     state = build_state(
         config,
         inventory,
         snapshot,
+        privacy=privacy,
         started_at=started_at,
         completed_at=completed_at,
     )
@@ -87,7 +90,7 @@ def scan_project(config: ScanConfig) -> ScanResult:
 
     state_path = _write_state(config.output_state, state) if config.output_state is not None else None
     completion = "partial"
-    warnings = tuple(inventory.warnings) + (
+    warnings = tuple(inventory.warnings) + tuple(privacy.warnings) + (
         "Semantic analysis and runtime verification are not established by deterministic state construction",
     )
     return ScanResult(

@@ -10,6 +10,8 @@ from typing import Sequence
 
 from .config import ScanConfig
 from .core import scan_project
+from .inventory import build_inventory
+from .privacy import build_egress_preview
 from .version import __version__
 from .errors import (
     CommandError,
@@ -34,6 +36,7 @@ def _primary_parser() -> argparse.ArgumentParser:
     parser.add_argument("--privacy", choices=("offline", "local", "controlled-remote"), default="offline")
     parser.add_argument("--redact", choices=("none", "standard", "strict"), default="standard")
     parser.add_argument("--exclude", action="append", default=[])
+    parser.add_argument("--sensitive-path", action="append", default=[])
     parser.add_argument("--max-file-bytes", type=int, default=5_000_000)
     parser.add_argument("--max-total-bytes", type=int, default=250_000_000)
     parser.add_argument("--follow-internal-links", action="store_true")
@@ -57,6 +60,14 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
         parser.add_argument("--version", choices=("1.2", "1.3"), default="1.3")
     elif command == "egress":
         parser.add_argument("path", nargs="?", type=Path, default=Path("."))
+        parser.add_argument("--privacy", choices=("offline", "local", "controlled-remote"), default="controlled-remote")
+        parser.add_argument("--redact", choices=("none", "standard", "strict"), default="standard")
+        parser.add_argument("--exclude", action="append", default=[])
+        parser.add_argument("--sensitive-path", action="append", default=[])
+        parser.add_argument("--max-file-bytes", type=int, default=5_000_000)
+        parser.add_argument("--max-total-bytes", type=int, default=250_000_000)
+        parser.add_argument("--follow-internal-links", action="store_true")
+        parser.add_argument("--json", action="store_true")
     return parser
 
 
@@ -67,6 +78,32 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
             raise SourceError(f"Source path does not exist: {args.path}")
         validate_path(args.path)
         return int(ExitCode.OK)
+    if command == "egress":
+        if not args.path.exists():
+            raise SourceError(f"Source path does not exist: {args.path}")
+        config = ScanConfig(
+            root=args.path,
+            privacy_mode=args.privacy,
+            redaction_level=args.redact,
+            excludes=tuple(args.exclude),
+            sensitive_paths=tuple(args.sensitive_path),
+            max_file_bytes=args.max_file_bytes,
+            max_total_bytes=args.max_total_bytes,
+            follow_internal_links=args.follow_internal_links,
+        )
+        preview = build_egress_preview(config, build_inventory(config))
+        payload = preview.as_dict()
+        if args.json:
+            print(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+        else:
+            print(f"files selected: {payload['files_selected']}")
+            print(f"bytes selected: {payload['bytes_selected']}")
+            print(f"files omitted by policy: {payload['files_omitted_by_policy']}")
+            print(f"redaction count: {payload['redaction_count']}")
+            print(f"sensitive paths omitted: {payload['sensitive_paths_omitted']}")
+            print(f"privacy mode: {payload['privacy_mode']}")
+            print("network action: none")
+        return int(ExitCode.OK)
     raise CommandError(f"'scan {command}' is reserved by the v0.2 contract but is not implemented in this slice")
 
 
@@ -76,7 +113,7 @@ def _run_primary(argv: Sequence[str]) -> int:
     if not root.exists():
         raise SourceError(f"Source path does not exist: {root}")
     if not args.no_html:
-        raise CommandError("HTML rendering lands in Slice 5; use --no-html for canonical state output in Slice 3")
+        raise CommandError("HTML rendering is not implemented yet; use --no-html for canonical Scan 1.3 state output")
 
     config = ScanConfig(
         root=root,
@@ -85,6 +122,7 @@ def _run_primary(argv: Sequence[str]) -> int:
         privacy_mode=args.privacy,
         redaction_level=args.redact,
         excludes=tuple(args.exclude),
+        sensitive_paths=tuple(args.sensitive_path),
         max_file_bytes=args.max_file_bytes,
         max_total_bytes=args.max_total_bytes,
         follow_internal_links=args.follow_internal_links,
