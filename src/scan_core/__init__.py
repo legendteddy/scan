@@ -1,11 +1,8 @@
 """Public Scan Core API.
 
-Slice 1 freezes packaging, configuration, validation dispatch and CLI exit codes.
-Slice 2 adds deterministic inventory and snapshot identity.
-Slice 3 adds canonical Scan 1.3 state construction and state-only scan orchestration.
-Slice 4 adds deterministic privacy assessment, redaction and egress previews.
-Slice 5 renders validated self-contained HTML directly from canonical state.
-Slice 6 adds ScanBench v1, bundled schemas, project config and release hardening.
+The v0.2 line established deterministic inventory, canonical state, privacy,
+self-contained rendering and ScanBench. The v0.3 line adds repeat-scan state
+comparison, local baselines and strict evidence freshness/reuse semantics.
 """
 
 from .builder import (
@@ -36,6 +33,7 @@ from .privacy import (
     redact_value,
 )
 from .render import render_html, render_report
+from .reuse import ReuseDecision, ReusePolicy, evaluate_reuse
 from .scanbench import BenchResult, run_bench
 from .schema import schema_object, schema_text
 from .settings import ProjectSettings, load_project_settings
@@ -59,6 +57,8 @@ __all__ = [
     "InventoryResult",
     "PrivacyAssessment",
     "ProjectSettings",
+    "ReuseDecision",
+    "ReusePolicy",
     "RedactionPolicy",
     "RedactionResult",
     "ScanConfig",
@@ -76,6 +76,7 @@ __all__ = [
     "canonical_state_json",
     "compare_states",
     "configuration_digest",
+    "evaluate_reuse",
     "load_project_settings",
     "prepare_text_for_egress",
     "redact_value",

@@ -14,6 +14,7 @@ import json
 from typing import Any, Iterable, Mapping, Sequence
 
 from .errors import ValidationError
+from .reuse import check_definition_digest
 from .validate import CHECK_CATEGORIES, validate_state
 
 
@@ -216,6 +217,7 @@ class SemanticStateBuilder:
         method: str, source_digest: str, producer_kind: str,
         producer_name: str, producer_version: str, limitations: str | None = None,
         time: str | None = None, inspection_origin: str = "fresh",
+        evidence_class: str | None = None, check_id: str | None = None,
         record_id: str | None = None,
     ) -> str:
         self._refs("evidence", "artifact_id", (artifact_id,), self._ids("artifacts"), "an artifact ID")
@@ -226,14 +228,42 @@ class SemanticStateBuilder:
             "name": _required(producer_name, f"{ident}.producer.name"),
             "version": _required(producer_version, f"{ident}.producer.version"),
         }
+        if self.state.get("schema_version") == "1.4" and inspection_origin != "fresh":
+            raise BuilderError(f"{ident}.inspection_origin: Scan 1.4 semantic authoring creates fresh evidence only")
+        if evidence_class is not None:
+            evidence_class = _required(evidence_class, f"{ident}.evidence_class")
+        if check_id is not None:
+            check_id = _required(check_id, f"{ident}.check_id")
+            self._refs(ident, "check_id", (check_id,), self._ids("checks"), "a check ID")
+        observed_at = time or self.state["run"]["completed_at"]
         record = EvidenceRecord(
             ident, artifact_id, _required(locator, f"{ident}.locator"), _required(kind, f"{ident}.kind"),
             _required(claim, f"{ident}.claim"), _required(result, f"{ident}.result"),
-            _required(method, f"{ident}.method"), time or self.state["run"]["completed_at"],
+            _required(method, f"{ident}.method"), observed_at,
             _required(limitations, f"{ident}.limitations"), _required(inspection_origin, f"{ident}.inspection_origin"),
             producer, _required(source_digest, f"{ident}.source_digest"),
         )
-        return self._append("evidence", record)
+        evidence_id = self._append("evidence", record)
+        row = next(item for item in self.state["evidence"] if item["id"] == evidence_id)
+        if self.state.get("schema_version") == "1.4":
+            row["freshness"] = {
+                "status": "fresh",
+                "source_state_digest": None,
+                "source_evidence_id": None,
+                "original_observed_at": observed_at,
+                "reused_at": None,
+                "reuse_reason": None,
+            }
+            if evidence_class is not None:
+                row["evidence_class"] = evidence_class
+            if check_id is not None:
+                row["check_id"] = check_id
+                check = next(item for item in self.state["checks"] if item["id"] == check_id)
+                row["check_definition_digest"] = check_definition_digest(check)
+        tools = self.state.get("provenance", {}).get("tool_versions")
+        if isinstance(tools, list) and producer not in tools:
+            tools.append(dict(producer))
+        return evidence_id
 
     def add_relationship(
         self, *, from_id: str, to_id: str, kind: str, explanation: str,
@@ -427,11 +457,27 @@ class SemanticStateBuilder:
         coverage = self.state["coverage"]
         if self.state.get("schema_version") == "1.4":
             baseline = self.state["baseline"]
-            reused = sum(1 for row in self.state["evidence"] if row.get("inspection_origin") == "verified_reuse")
+            checks_by_id = {row["id"]: row for row in self.state["checks"]}
+            for evidence in self.state["evidence"]:
+                freshness = evidence.get("freshness")
+                if isinstance(freshness, dict) and freshness.get("status") == "fresh":
+                    check_id = evidence.get("check_id")
+                    if isinstance(check_id, str) and check_id in checks_by_id:
+                        evidence["check_definition_digest"] = check_definition_digest(checks_by_id[check_id])
+            reused = sum(
+                1 for row in self.state["evidence"]
+                if isinstance(row.get("freshness"), dict)
+                and row["freshness"].get("status") == "verified_reuse"
+            )
+            fresh = sum(
+                1 for row in self.state["evidence"]
+                if isinstance(row.get("freshness"), dict)
+                and row["freshness"].get("status") == "fresh"
+            )
             if baseline["status"] != "used" and reused:
                 raise BuilderError("baseline.reused_evidence_count: verified_reuse evidence requires a used baseline")
             baseline["reused_evidence_count"] = reused
-            baseline["fresh_evidence_count"] = len(self.state["evidence"]) - reused
+            baseline["fresh_evidence_count"] = fresh
         coverage["counts_by_status"] = dict(Counter(row["status"] for row in self.state["artifacts"]))
         coverage["counts_by_check_status"] = dict(Counter(row["status"] for row in self.state["checks"]))
         coverage["checks_complete"] = all(row["status"] in {"assessed", "not_applicable"} for row in self.state["checks"])

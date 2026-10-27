@@ -231,6 +231,7 @@ def _run_primary(argv: Sequence[str]) -> int:
     )
     result = scan_project(config)
     delta = result.state["delta"]
+    baseline = result.state["baseline"]
     summary = {
         "schema_version": result.state["schema_version"],
         "scan_id": result.state["run"]["scan_id"],
@@ -238,7 +239,12 @@ def _run_primary(argv: Sequence[str]) -> int:
         "snapshot_digest": result.state["provenance"]["snapshot_digest"],
         "artifact_count": result.state["coverage"]["discovered_artifact_count"],
         "completion": result.completion,
-        "baseline_status": result.state["baseline"]["status"],
+        "baseline_status": baseline["status"],
+        "evidence_freshness": {
+            "fresh": baseline["fresh_evidence_count"],
+            "reused": baseline["reused_evidence_count"],
+            "rejected_reuse": baseline["rejected_reuse_count"],
+        },
         "delta_available": delta["available"],
         "delta": delta,
         "state_path": str(result.state_path) if result.state_path is not None else None,
@@ -253,6 +259,11 @@ def _run_primary(argv: Sequence[str]) -> int:
         print(f"Snapshot: {summary['snapshot_digest']}")
         print(f"Mode: {summary['mode']} | artifacts: {summary['artifact_count']} | completion: {summary['completion']}")
         print(f"Baseline: {summary['baseline_status']}")
+        freshness = summary["evidence_freshness"]
+        print(
+            f"Evidence: {freshness['fresh']} fresh | {freshness['reused']} reused | "
+            f"{freshness['rejected_reuse']} reuse rejected"
+        )
         if delta["available"]:
             artifacts = delta["artifacts"]
             findings = delta["findings"]

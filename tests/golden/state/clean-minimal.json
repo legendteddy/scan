@@ -360,6 +360,14 @@
     {
       "artifact_id": "artifact:62d0a0ae93133a7aad1a",
       "claim": "Scan Core deterministically inventoried this artifact",
+      "freshness": {
+        "original_observed_at": "<volatile-time>",
+        "reuse_reason": null,
+        "reused_at": null,
+        "source_evidence_id": null,
+        "source_state_digest": null,
+        "status": "fresh"
+      },
       "id": "evidence:93ca95f9e9a0c56a139a",
       "inspection_origin": "fresh",
       "kind": "static",
@@ -369,7 +377,7 @@
       "producer": {
         "kind": "scan-core",
         "name": "scan-core",
-        "version": "0.3.0.dev2"
+        "version": "0.3.0.dev3"
       },
       "result": "{\"content_identity\":\"sha256:1a3eebf3701bf2aa4d26a487bb1fa80a41cb0884a78658930e46dd5d1a051b74\",\"excluded\":false,\"path_kind\":\"file\",\"size_bytes\":16,\"symlink_scope\":null}",
       "source_digest": "sha256:1a3eebf3701bf2aa4d26a487bb1fa80a41cb0884a78658930e46dd5d1a051b74",
@@ -444,7 +452,7 @@
       {
         "kind": "scan-core",
         "name": "scan-core",
-        "version": "0.3.0.dev2"
+        "version": "0.3.0.dev3"
       }
     ]
   },
@@ -455,7 +463,7 @@
     "network_used": false,
     "scan_id": "<volatile-run-id>",
     "scan_mode": "deep",
-    "scan_version": "0.3.0.dev2",
+    "scan_version": "0.3.0.dev3",
     "started_at": "<volatile-time>",
     "target_executed": false
   },

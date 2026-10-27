@@ -18,7 +18,22 @@
     "artifacts": {"type": "array", "items": {"type": "object", "required": ["id", "locator", "type", "status", "reason", "evidence_ids", "inspection_origin", "inspected_at", "content_identity", "size_bytes", "media_type", "path_kind", "redaction_state"]}},
     "components": {"type": "array", "items": {"type": "object"}},
     "relationships": {"type": "array", "items": {"type": "object"}},
-    "evidence": {"type": "array", "items": {"type": "object", "required": ["producer", "source_digest"]}},
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["producer", "source_digest", "freshness"],
+        "properties": {
+          "freshness": {
+            "type": "object",
+            "required": ["status", "source_state_digest", "source_evidence_id", "original_observed_at", "reused_at", "reuse_reason"],
+            "properties": {
+              "status": {"enum": ["fresh", "verified_reuse"]}
+            }
+          }
+        }
+      }
+    },
     "findings": {"type": "array", "items": {"type": "object"}},
     "controls": {"type": "array", "items": {"type": "object"}},
     "unknowns": {"type": "array", "items": {"type": "object"}},

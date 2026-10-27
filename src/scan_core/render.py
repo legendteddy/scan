@@ -244,7 +244,8 @@ def _baseline_section(state: Mapping[str, Any]) -> str:
         _metric("New unknowns", _count(len(unknowns["new"]), "delta_unknowns_new"), "Newly recorded unanswered questions"),
         _metric("Resolved unknowns", _count(len(unknowns["resolved"]), "delta_unknowns_resolved"), "Absent now; not proof of verification"),
         _metric("Fresh evidence", _count(baseline["fresh_evidence_count"], "fresh_evidence_count"), "Observed in this scan"),
-        _metric("Reused evidence", _count(baseline["reused_evidence_count"], "reused_evidence_count"), "Slice 2 does not reuse evidence"),
+        _metric("Reused evidence", _count(baseline["reused_evidence_count"], "reused_evidence_count"), "Safely reused at original depth"),
+        _metric("Rejected reuse", _count(baseline["rejected_reuse_count"], "rejected_reuse_count"), "Prior candidates that failed a reuse gate"),
     ])
     return (
         '<section class="section" aria-labelledby="baseline-title">'
@@ -323,6 +324,7 @@ def _appendix(state: Mapping[str, Any]) -> str:
         [
             f'<code id="e-{_h(row["id"])}">{_h(row["id"])}</code>',
             _h(row["kind"]),
+            _h(row.get("freshness", {}).get("status", row["inspection_origin"])),
             _h(row["locator"]),
             _h(row["result"]),
             _h(row["limitations"]),
@@ -349,7 +351,7 @@ def _appendix(state: Mapping[str, Any]) -> str:
         + "<h3>Evidence</h3>"
         + _scroll_table(
             "Evidence; scroll horizontally if needed",
-            ["ID", "Kind", "Locator", "Observation", "Limitations"],
+            ["ID", "Kind", "Freshness", "Locator", "Observation", "Limitations"],
             evidence_rows,
             "table-evidence",
         )

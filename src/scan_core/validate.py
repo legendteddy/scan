@@ -509,6 +509,54 @@ def _validate_state_1_4(state):
     require(baseline['fresh_evidence_count'] + baseline['reused_evidence_count'] == len(state['evidence']),
             'baseline fresh/reused evidence counts must reconcile with evidence collection')
 
+    freshness_counts = Counter()
+    reusable_classes = {'static_semantic', 'static_architecture', 'static_content'}
+    runtime_classes = {'runtime', 'live_service', 'deployment', 'time_sensitive_dependency'}
+    for evidence in state['evidence']:
+        label = evidence['id'] + ': '
+        freshness = evidence.get('freshness')
+        require(isinstance(freshness, dict), label + 'Scan 1.4 evidence requires freshness metadata')
+        status = freshness.get('status')
+        require(status in {'fresh', 'verified_reuse'}, label + 'invalid freshness.status')
+        freshness_counts[status] += 1
+        require(freshness.get('original_observed_at') == evidence['time'],
+                label + 'freshness.original_observed_at must preserve evidence.time')
+        _rfc3339(freshness['original_observed_at'], label + 'freshness.original_observed_at')
+        evidence_class = evidence.get('evidence_class')
+        if evidence_class is not None:
+            require(string(evidence_class), label + 'evidence_class must be a nonempty string')
+        check_id = evidence.get('check_id')
+        definition_digest = evidence.get('check_definition_digest')
+        if check_id is not None:
+            require(string(check_id), label + 'check_id must be a nonempty string')
+        if definition_digest is not None:
+            _sha256(definition_digest, label + 'check_definition_digest')
+        if status == 'fresh':
+            require(evidence['inspection_origin'] == 'fresh', label + 'fresh evidence must have fresh inspection_origin')
+            require(freshness.get('source_state_digest') is None, label + 'fresh evidence source_state_digest must be null')
+            require(freshness.get('source_evidence_id') is None, label + 'fresh evidence source_evidence_id must be null')
+            require(freshness.get('reused_at') is None, label + 'fresh evidence reused_at must be null')
+            require(freshness.get('reuse_reason') is None, label + 'fresh evidence reuse_reason must be null')
+        else:
+            require(evidence['inspection_origin'] == 'verified_reuse',
+                    label + 'verified_reuse freshness requires verified_reuse inspection_origin')
+            _sha256(freshness.get('source_state_digest'), label + 'freshness.source_state_digest')
+            require(string(freshness.get('source_evidence_id')), label + 'reused evidence needs source_evidence_id')
+            reused_at = _rfc3339(freshness.get('reused_at'), label + 'freshness.reused_at')
+            observed_at = _rfc3339(freshness['original_observed_at'], label + 'freshness.original_observed_at')
+            require(reused_at >= observed_at, label + 'reused_at cannot precede original_observed_at')
+            require(string(freshness.get('reuse_reason')), label + 'reused evidence needs reuse_reason')
+            require(evidence.get('kind') != 'observed', label + 'runtime/observed evidence cannot be automatically reused')
+            require(evidence_class in reusable_classes and evidence_class not in runtime_classes,
+                    label + 'reused evidence class is not eligible for automatic reuse')
+            require(string(check_id), label + 'reused evidence requires check_id')
+            _sha256(definition_digest, label + 'check_definition_digest')
+
+    require(freshness_counts.get('fresh', 0) == baseline['fresh_evidence_count'],
+            'baseline fresh_evidence_count must match evidence freshness metadata')
+    require(freshness_counts.get('verified_reuse', 0) == baseline['reused_evidence_count'],
+            'baseline reused_evidence_count must match evidence freshness metadata')
+
     if baseline['status'] == 'used':
         require(baseline['source_schema_version'] in {'1.3', '1.4'},
                 'used baseline requires source_schema_version 1.3 or 1.4')
@@ -516,6 +564,11 @@ def _validate_state_1_4(state):
         _sha256(baseline['source_snapshot_digest'], 'baseline.source_snapshot_digest')
         require(baseline['snapshot_relation'] in {'same', 'changed', 'unknown'},
                 'used baseline cannot have snapshot_relation none')
+        for evidence in state['evidence']:
+            freshness = evidence['freshness']
+            if freshness['status'] == 'verified_reuse':
+                require(freshness['source_state_digest'] == baseline['source_state_digest'],
+                        evidence['id'] + ': reused evidence must point to the immediate baseline state')
     else:
         require(baseline['source_schema_version'] is None,
                 'unused baseline source_schema_version must be null')
@@ -638,6 +691,7 @@ def _expected_visible_counts(state):
             'delta_unknowns_resolved': len(delta['unknowns']['resolved']),
             'fresh_evidence_count': baseline['fresh_evidence_count'],
             'reused_evidence_count': baseline['reused_evidence_count'],
+            'rejected_reuse_count': baseline['rejected_reuse_count'],
         })
     return expected
 

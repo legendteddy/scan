@@ -44,7 +44,7 @@ The validator verifies schema, typed references, evidence origins and coverage a
 
 ## Standalone alpha core
 
-The packaged standalone core requires **Python 3.11+**. It can inventory a local project, create canonical Scan 1.4 JSON, compare repeated scans against a prior local state, render a self-contained HTML report from that exact state, validate both formats, enforce deterministic privacy/redaction metadata, and produce a no-network egress preview.
+The packaged standalone core requires **Python 3.11+**. It can inventory a local project, create canonical Scan 1.4 JSON, compare repeated scans against a prior local state, safely reuse compatible higher-level static evidence, render a self-contained HTML report from that exact state, validate both formats, enforce deterministic privacy/redaction metadata, and produce a no-network egress preview.
 
 ```bash
 python -m pip install .
@@ -140,6 +140,12 @@ semantic_state = builder.build()
 
 `upgrade_semantic_state(core_state)` is a convenience alias for starting the same builder from deterministic state. Raw canonical JSON remains supported for advanced callers.
 
+### Evidence freshness and safe reuse
+
+Every run rebuilds the current inventory, hashes and provenance evidence fresh. Prior **higher-level static evidence** is considered for reuse only when its artifact/content identity is unchanged, its producer and producer version exactly match an available current producer, its check identity/definition still matches, its evidence class is explicitly reusable, and the current privacy policy can represent it safely. Runtime, observed, deployment/live-state and time-sensitive evidence is never automatically reused in v0.3.
+
+New semantic evidence created through `SemanticStateBuilder` is marked fresh. Reused evidence retains its original observation time, depth and limitations and is marked `verified_reuse`; it never upgrades `content_read` to `analyzed`, an unfinished check to assessed, or static evidence to runtime verification. The state and HTML report expose fresh, reused and rejected-reuse counts separately. Current redaction/sensitive-path policy always wins over older baseline content.
+
 ### ScanBench v1
 
 `scan bench` runs 12 mandatory synthetic adversarial fixtures covering hidden files, escaping symlinks, prompt injection, redaction, hostile filenames, unreadable content, archives, unsupported binaries, generated/vendor files, resource boundaries and false runtime claims. Results are reported separately for **inventory completeness, state integrity, evidence correctness, privacy integrity, and safety-boundary compliance**. ScanBench deliberately does **not** calculate a blended quality score.
@@ -199,6 +205,7 @@ pyproject.toml                   Scan Core package metadata and `scan` entry poi
 src/scan_core/                   v0.3 deterministic core package
 src/scan_core/baseline.py        Local-only bounded baseline resolver
 src/scan_core/compare.py         Pure deterministic 1.3/1.4 state comparison
+src/scan_core/reuse.py           Strict evidence freshness/reuse decision engine
 src/scan_core/render.py          Validated canonical-state HTML renderer
 src/scan_core/scanbench.py       ScanBench v1 deterministic harness
 src/scan_core/settings.py        `.scan/config.toml` loader and precedence defaults
