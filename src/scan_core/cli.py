@@ -64,7 +64,7 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
             raise SourceError(f"Source path does not exist: {args.path}")
         validate_path(args.path)
         return int(ExitCode.OK)
-    raise CommandError(f"'scan {command}' is reserved by the v0.2 contract but is not implemented in Slice 1")
+    raise CommandError(f"'scan {command}' is reserved by the v0.2 contract but is not implemented in this slice")
 
 
 def _run_primary(argv: Sequence[str]) -> int:
@@ -72,7 +72,7 @@ def _run_primary(argv: Sequence[str]) -> int:
     root = Path(args.path)
     if not root.exists():
         raise SourceError(f"Source path does not exist: {root}")
-    raise CommandError("Project scanning is reserved for Slice 2; Slice 1 provides packaging and validation only")
+    raise CommandError("Project report generation is not available until the canonical state builder lands in Slice 3")
 
 
 def main(argv: Sequence[str] | None = None) -> int:

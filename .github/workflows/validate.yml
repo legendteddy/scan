@@ -25,15 +25,15 @@ jobs:
       - name: Install Scan package
         run: python -m pip install --disable-pip-version-check .
 
-      - name: Compile package, validator and demo generator
+      - name: Compile package, tests, validator and demo generator
         run: |
-          python -m compileall -q src/scan_core
-          python -m py_compile scripts/validate_report.py scripts/test_validate_report.py scripts/build_demo_report.py tests/test_slice1.py
+          python -m compileall -q src/scan_core tests
+          python -m py_compile scripts/validate_report.py scripts/test_validate_report.py scripts/build_demo_report.py
 
       - name: Run frozen Scan 1.2 validator contract tests
         run: python -B -m unittest discover -s scripts -p "test_*.py" -v
 
-      - name: Run Scan Core Slice 1 tests
+      - name: Run Scan Core tests
         run: python -B -m unittest discover -s tests -p "test_*.py" -v
 
       - name: Verify packaged CLI

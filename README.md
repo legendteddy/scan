@@ -92,8 +92,9 @@ Optional visual QA and screenshot refresh: \`python scripts/capture_preview.py\`
 \`\`\`text
 SKILL.md                         Agent instructions and safety boundaries
 pyproject.toml                   Scan Core package metadata and `scan` entry point
-src/scan_core/                   v0.2 deterministic core package (Slice 1 foundation)
-tests/                           Packaged CLI/contract regression tests
+src/scan_core/                   v0.2 deterministic core package
+scanbench/fixtures/              Adversarial/ground-truth fixtures for deterministic gates
+tests/                           Packaged core/contract regression tests
 agents/openai.yaml               Skill metadata
 assets/report-shell.html         Self-contained HTML dashboard template
 assets/report-components.html    Report component patterns
