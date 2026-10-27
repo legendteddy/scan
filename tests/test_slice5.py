@@ -49,7 +49,7 @@ class RendererSliceTests(unittest.TestCase):
     def test_renderer_does_not_upgrade_historical_12_report_state(self):
         state = load_report_state(DEMO_12)
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(ValidationError, "1.3 only"):
+            with self.assertRaisesRegex(ValidationError, "1.3 or 1.4 only"):
                 render_report(state, Path(directory) / "report.html")
 
     def test_embedded_json_escapes_html_sensitive_characters(self):

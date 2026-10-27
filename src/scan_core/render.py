@@ -1,4 +1,4 @@
-"""Self-contained HTML rendering from validated canonical Scan 1.3 state."""
+"""Self-contained HTML rendering from validated canonical Scan state."""
 
 from __future__ import annotations
 
@@ -173,6 +173,39 @@ def _system_map(state: Mapping[str, Any]) -> str:
     return f'<div class="map-row">{nodes}</div><p class="evidence-ref">{_h(relation_note)}</p>'
 
 
+def _baseline_section(state: Mapping[str, Any]) -> str:
+    if state.get("schema_version") != "1.4":
+        return ""
+    baseline = state["baseline"]
+    delta = state["delta"]
+    artifacts = delta["artifacts"]
+    findings = delta["findings"]
+    unknowns = delta["unknowns"]
+    title = "Since baseline" if delta["available"] else "Baseline comparison unavailable"
+    note = (
+        f"Baseline status: {baseline['status']}. Snapshot relation: {baseline['snapshot_relation']}."
+        if delta["available"]
+        else f"Baseline status: {baseline['status']}. No prior state is being presented as a comparison."
+    )
+    metrics = "".join([
+        _metric("Artifacts added", _count(len(artifacts["added"]), "delta_artifacts_added"), "Current IDs absent from baseline"),
+        _metric("Artifacts changed", _count(len(artifacts["changed"]), "delta_artifacts_changed"), "Same path identity, changed fingerprint"),
+        _metric("Artifacts removed", _count(len(artifacts["removed"]), "delta_artifacts_removed"), "Baseline IDs absent from current state"),
+        _metric("New findings", _count(len(findings["new"]), "delta_findings_new"), "Current finding IDs absent from baseline"),
+        _metric("Resolved findings", _count(len(findings["resolved"]), "delta_findings_resolved"), "Absent now; not proof of remediation"),
+        _metric("New unknowns", _count(len(unknowns["new"]), "delta_unknowns_new"), "Newly recorded unanswered questions"),
+        _metric("Resolved unknowns", _count(len(unknowns["resolved"]), "delta_unknowns_resolved"), "Absent now; not proof of verification"),
+        _metric("Fresh evidence", _count(baseline["fresh_evidence_count"], "fresh_evidence_count"), "Observed in this scan"),
+        _metric("Reused evidence", _count(baseline["reused_evidence_count"], "reused_evidence_count"), "Slice 2 does not reuse evidence"),
+    ])
+    return (
+        '<section class="section" aria-labelledby="baseline-title">'
+        '<div class="section-head"><div class="section-kicker">Repeat scan</div>'
+        f'<h2 id="baseline-title">{_h(title)}</h2><p class="section-intro">{_h(note)}</p></div>'
+        f'<div class="metric-grid">{metrics}</div></section>'
+    )
+
+
 def _coverage_rows(state: Mapping[str, Any]) -> str:
     coverage = state["coverage"]
     artifact_count = coverage["discovered_artifact_count"]
@@ -256,8 +289,11 @@ def _appendix(state: Mapping[str, Any]) -> str:
 
 
 def render_html(state: Mapping[str, Any]) -> str:
-    """Return self-contained HTML for validated Scan 1.3 state."""
-    validated = validate_state(dict(state), version="1.3")
+    """Return self-contained HTML for validated Scan 1.3/1.4 state."""
+    version = state.get("schema_version")
+    if version not in {"1.3", "1.4"}:
+        raise ValidationError("Renderer accepts canonical schema_version 1.3 or 1.4 only")
+    validated = validate_state(dict(state), version=version)
     coverage = validated["coverage"]
     check_counts = coverage["counts_by_check_status"]
     statuses = coverage["counts_by_status"]
@@ -285,7 +321,7 @@ def render_html(state: Mapping[str, Any]) -> str:
         f'<p>{_h(limitations)}</p></div></div>'
     )
 
-    target_specific = (
+    target_specific = _baseline_section(validated) + (
         '<section class="section" aria-labelledby="privacy-title">'
         '<div class="section-head"><div class="section-kicker">Privacy boundary</div>'
         '<h2 id="privacy-title">Local-first by construction</h2>'
@@ -361,8 +397,8 @@ def render_html(state: Mapping[str, Any]) -> str:
 
 def render_report(state: Mapping[str, Any], output: str | Path) -> Path:
     """Validate state, write self-contained HTML atomically, then validate round-trip."""
-    if state.get("schema_version") != "1.3":
-        raise ValidationError("Scan v0.2 renderer accepts canonical schema_version 1.3 only")
+    if state.get("schema_version") not in {"1.3", "1.4"}:
+        raise ValidationError("Renderer accepts canonical schema_version 1.3 or 1.4 only")
     html = render_html(state)
     path = Path(output)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,4 @@
-"""Scan v0.2 command-line interface and stable exit codes."""
+"""Scan command-line interface and stable exit codes."""
 
 from __future__ import annotations
 
@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from .baseline import load_state_file
+from .compare import compare_states
 from .config import ScanConfig
 from .core import scan_project
 from .errors import (
@@ -28,7 +30,7 @@ from .settings import load_project_settings
 from .validate import validate_path
 from .version import __version__
 
-UTILITY_COMMANDS = {"validate", "render", "bench", "schema", "egress"}
+UTILITY_COMMANDS = {"validate", "render", "bench", "schema", "egress", "compare"}
 
 
 def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool) -> None:
@@ -50,6 +52,8 @@ def _primary_parser() -> argparse.ArgumentParser:
     parser.add_argument("--state", type=Path, default=Path(".scan/state.json"))
     parser.add_argument("--no-html", action="store_true")
     _add_scan_options(parser, include_offline=True)
+    parser.add_argument("--baseline", default=None, help="auto | none | PATH")
+    parser.add_argument("--no-reuse", action="store_true", help="Compare baseline but do not reuse prior evidence")
     parser.add_argument("--fail-on", choices=("PARTIAL", "ERROR"))
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--quiet", action="store_true")
@@ -69,6 +73,10 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
         parser.add_argument("--json", action="store_true")
     elif command == "schema":
         parser.add_argument("--version", choices=("1.2", "1.3", "1.4"), default="1.4")
+    elif command == "compare":
+        parser.add_argument("old_state", type=Path)
+        parser.add_argument("new_state", type=Path)
+        parser.add_argument("--json", action="store_true")
     elif command == "egress":
         parser.add_argument("path", nargs="?", type=Path, default=Path("."))
         _add_scan_options(parser, include_offline=False)
@@ -111,6 +119,16 @@ def _resolved_config(
         if getattr(args, "follow_internal_links", None) is not None
         else settings.follow_internal_links
     )
+    baseline_value = getattr(args, "baseline", None)
+    baseline_path = None
+    if baseline_value is None:
+        baseline_mode = settings.baseline_mode
+    elif baseline_value in {"auto", "none"}:
+        baseline_mode = baseline_value
+    else:
+        baseline_mode = "explicit"
+        baseline_path = Path(baseline_value)
+    reuse_enabled = False if baseline_mode == "none" or bool(getattr(args, "no_reuse", False)) else settings.reuse_enabled
     return ScanConfig(
         root=root,
         output_state=output_state,
@@ -122,6 +140,10 @@ def _resolved_config(
         max_file_bytes=max_file,
         max_total_bytes=max_total,
         follow_internal_links=follow,
+        baseline_mode=baseline_mode,
+        baseline_path=baseline_path,
+        reuse_enabled=reuse_enabled,
+        max_baseline_state_bytes=settings.max_baseline_state_bytes,
     )
 
 
@@ -148,6 +170,29 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
     if command == "schema":
         text = schema_text(args.version)
         print(text, end="" if text.endswith("\n") else "\n")
+        return int(ExitCode.OK)
+    if command == "compare":
+        for path in (args.old_state, args.new_state):
+            if not path.exists():
+                raise SourceError(f"Source path does not exist: {path}")
+        old_state = load_state_file(args.old_state)
+        new_state = load_state_file(args.new_state)
+        comparison = compare_states(old_state, new_state)
+        payload = comparison.as_dict()
+        if args.json:
+            print(json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")))
+        else:
+            artifacts = payload["artifacts"]
+            findings = payload["findings"]
+            unknowns = payload["unknowns"]
+            print(f"Snapshot: {payload['snapshot_relation']}")
+            print(
+                "Artifacts: "
+                f"+{len(artifacts['added'])} ~{len(artifacts['changed'])} "
+                f"-{len(artifacts['removed'])} ={len(artifacts['unchanged'])}"
+            )
+            print(f"Findings: +{len(findings['new'])} -{len(findings['resolved'])} ·{len(findings['persisting'])}")
+            print(f"Unknowns: +{len(unknowns['new'])} -{len(unknowns['resolved'])} ·{len(unknowns['persisting'])}")
         return int(ExitCode.OK)
     if command == "egress":
         if not args.path.exists():
@@ -182,12 +227,16 @@ def _run_primary(argv: Sequence[str]) -> int:
         output_html=None if args.no_html else args.output,
     )
     result = scan_project(config)
+    delta = result.state["delta"]
     summary = {
         "schema_version": result.state["schema_version"],
         "scan_id": result.state["run"]["scan_id"],
         "snapshot_digest": result.state["provenance"]["snapshot_digest"],
         "artifact_count": result.state["coverage"]["discovered_artifact_count"],
         "completion": result.completion,
+        "baseline_status": result.state["baseline"]["status"],
+        "delta_available": delta["available"],
+        "delta": delta,
         "state_path": str(result.state_path) if result.state_path is not None else None,
         "report_path": str(result.report_path) if result.report_path is not None else None,
     }
@@ -199,6 +248,20 @@ def _run_primary(argv: Sequence[str]) -> int:
             print(f"Report written to {summary['report_path']}")
         print(f"Snapshot: {summary['snapshot_digest']}")
         print(f"Artifacts: {summary['artifact_count']} | completion: {summary['completion']}")
+        print(f"Baseline: {summary['baseline_status']}")
+        if delta["available"]:
+            artifacts = delta["artifacts"]
+            findings = delta["findings"]
+            unknowns = delta["unknowns"]
+            print(
+                "Since baseline: "
+                f"artifacts +{len(artifacts['added'])} ~{len(artifacts['changed'])} -{len(artifacts['removed'])} ={len(artifacts['unchanged'])}; "
+                f"findings +{len(findings['new'])} -{len(findings['resolved'])}; "
+                f"unknowns +{len(unknowns['new'])} -{len(unknowns['resolved'])}"
+            )
+    for warning in result.warnings:
+        if warning.startswith("Automatic baseline ignored:"):
+            print(f"scan: warning: {warning}", file=sys.stderr)
     if args.fail_on == "PARTIAL" and result.completion != "complete":
         raise CoverageThresholdError("scan completed but the requested PARTIAL threshold was not met")
     return int(ExitCode.OK)
