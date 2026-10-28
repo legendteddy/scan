@@ -60,6 +60,8 @@ scan validate .scan/state.json
 scan validate .scan/report.html
 scan compare previous-state.json .scan/state.json --json
 scan render .scan/state.json --output .scan/rerendered.html
+# v0.6 development: read-only local receipt/history viewer (loopback by default).
+scan serve .scan
 # v0.5 development: export only canonical findings as SARIF 2.1.0.
 scan sarif .scan/state.json --output .scan/results.sarif
 scan schema --version 1.4
@@ -72,6 +74,8 @@ The standalone HTML report is static and useful without JavaScript. Its only scr
 The v0.5 SARIF exporter is deliberately narrower than the Scan report: only canonical `findings` become SARIF results. Unknowns, coverage gaps, unassessed checks and an empty finding set are not converted into alerts. File locations remain repository-relative and file-level unless stronger location evidence exists; Scan does not invent line numbers or GitHub line fingerprints. See [the v0.5 SARIF export contract](docs/v0.5-sarif-export.md).
 
 Third-party SARIF 2.1.0 can also be imported into an existing validated Scan state with `scan import-sarif BASE_STATE RESULTS.sarif --output NEW_STATE`. Only safely mapped `fail` results become static external-tool findings; review/open or unmapped results remain explicit unknowns, and imported prose is re-redacted before entering canonical state. See [the v0.5 SARIF import adapter contract](docs/v0.5-sarif-import.md).
+
+For local review, `scan serve .scan` starts a read-only loopback viewer over validated Scan state receipts. Directory mode can show multiple receipts and same-project comparisons, but it never exposes arbitrary neighboring files or the project tree. Non-loopback binding requires explicit `--allow-network`; history retention remains an explicit user/workflow decision rather than an automatic side effect. See [the v0.6 local report history contract](docs/v0.6-local-report-history.md).
 
 ### GitHub Action (v0.5 development)
 

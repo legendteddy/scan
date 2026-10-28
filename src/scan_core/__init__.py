@@ -38,6 +38,7 @@ from .reuse import ReuseDecision, ReusePolicy, SemanticCheckDefinition, Semantic
 from .scanbench import BenchResult, run_bench
 from .sarif_import import SarifImportResult, import_sarif, load_sarif_file
 from .schema import schema_object, schema_text
+from .serve import HistoryCatalog, ReceiptEntry, create_server, discover_receipts
 from .settings import ProjectSettings, load_project_settings
 from .snapshot import Snapshot, build_snapshot, canonical_manifest
 from .state import build_state, canonical_state_json, configuration_digest, state_digest
@@ -57,6 +58,7 @@ __all__ = [
     "EgressPreview",
     "EvidenceRecord",
     "FindingRecord",
+    "HistoryCatalog",
     "InventoryArtifact",
     "InventoryResult",
     "PrivacyAssessment",
@@ -65,6 +67,7 @@ __all__ = [
     "ReusePolicy",
     "RedactionPolicy",
     "RedactionResult",
+    "ReceiptEntry",
     "ScanConfig",
     "ScanResult",
     "SarifImportResult",
@@ -83,6 +86,8 @@ __all__ = [
     "canonical_state_json",
     "compare_states",
     "configuration_digest",
+    "create_server",
+    "discover_receipts",
     "evaluate_reuse",
     "import_sarif",
     "load_sarif_file",
