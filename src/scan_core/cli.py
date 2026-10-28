@@ -25,13 +25,14 @@ from .errors import (
 from .inventory import build_inventory
 from .privacy import build_egress_preview
 from .render import render_report
+from .sarif import write_sarif
 from .scanbench import format_bench, run_bench
 from .schema import schema_text
 from .settings import load_project_settings
 from .validate import validate_path
 from .version import __version__
 
-UTILITY_COMMANDS = {"validate", "render", "bench", "schema", "egress", "compare", "doctor"}
+UTILITY_COMMANDS = {"validate", "render", "sarif", "bench", "schema", "egress", "compare", "doctor"}
 
 
 def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool) -> None:
@@ -72,6 +73,10 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
     elif command == "render":
         parser.add_argument("state_json", type=Path)
         parser.add_argument("--output", type=Path, required=True)
+    elif command == "sarif":
+        parser.add_argument("state_json", type=Path)
+        parser.add_argument("--output", type=Path, required=True)
+        parser.add_argument("--pretty", action="store_true")
     elif command == "bench":
         parser.add_argument("fixture", nargs="?")
         parser.add_argument("--json", action="store_true")
@@ -170,6 +175,12 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
             raise SourceError(f"Source path does not exist: {args.state_json}")
         state = validate_path(args.state_json)
         render_report(state, args.output)
+        return int(ExitCode.OK)
+    if command == "sarif":
+        if not args.state_json.exists():
+            raise SourceError(f"Source path does not exist: {args.state_json}")
+        state = validate_path(args.state_json)
+        write_sarif(state, args.output, pretty=args.pretty)
         return int(ExitCode.OK)
     if command == "bench":
         result = run_bench(fixture=args.fixture)

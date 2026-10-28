@@ -29,7 +29,7 @@ scan . --offline
 
 The second run uses the previous local `.scan/state.json` as its baseline and reports what was added, changed, removed or unchanged, while keeping fresh and reused evidence separate. `scan doctor .` is an offline, non-destructive readiness diagnostic: it checks installed package assets, target access and optional Git support, and uses a temporary local output probe that it removes before returning. It does not install, repair or contact anything.
 
-When Scan 0.4.0 is published to PyPI, install the packaged CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`. Pin `scan-skill==0.4.0` when you need the exact release.
+Scan 0.4.0 is published on PyPI. Install the packaged CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`. Pin `scan-skill==0.4.0` when you need that exact release.
 
 ## What makes Scan different?
 
@@ -46,7 +46,7 @@ For the concrete false-confidence failure mode Scan is designed to prevent, read
 
 ## Standalone core
 
-The packaged standalone core requires **Python 3.11+**. It can inventory a local project, create canonical Scan 1.4 JSON, compare repeated scans against a prior local state, safely reuse compatible higher-level static evidence, render a self-contained HTML report from that exact state, validate both formats, enforce deterministic privacy/redaction metadata, and produce a no-network egress preview.
+The packaged standalone core requires **Python 3.11+**. It can inventory a local project, create canonical Scan 1.4 JSON, compare repeated scans against a prior local state, safely reuse compatible higher-level static evidence, render a self-contained HTML report from that exact state, validate both formats, enforce deterministic privacy/redaction metadata, produce a no-network egress preview, and (in v0.5 development) export canonical findings as SARIF 2.1.0.
 
 ```bash
 python -m pip install .
@@ -60,12 +60,16 @@ scan validate .scan/state.json
 scan validate .scan/report.html
 scan compare previous-state.json .scan/state.json --json
 scan render .scan/state.json --output .scan/rerendered.html
+# v0.5 development: export only canonical findings as SARIF 2.1.0.
+scan sarif .scan/state.json --output .scan/results.sarif
 scan schema --version 1.4
 scan egress . --privacy controlled-remote --redact strict --json
 scan bench
 ```
 
 The standalone HTML report is static and useful without JavaScript. Its only script block is inert `application/json` state with ID `project-anatomy-state`; visible count markers are validated against that embedded state. `scan egress` is preview-only: it reports selected/omitted files, selected bytes and redaction counts, and performs **no network action**. Use `--sensitive-path "pattern/**"` to keep declared path names out of canonical state and egress selection.
+
+The v0.5 SARIF exporter is deliberately narrower than the Scan report: only canonical `findings` become SARIF results. Unknowns, coverage gaps, unassessed checks and an empty finding set are not converted into alerts. File locations remain repository-relative and file-level unless stronger location evidence exists; Scan does not invent line numbers or GitHub line fingerprints. See [the v0.5 SARIF export contract](docs/v0.5-sarif-export.md).
 
 ### Scan modes
 
@@ -187,7 +191,7 @@ The validator verifies schema, typed references, evidence origins and coverage a
 
 Scan v0.4 adds a local, read-only MCP bridge so compatible AI hosts can use Scan Core without manually translating the CLI/state contract. The base package remains dependency-free; MCP is an optional extra.
 
-After v0.4.0 is published to PyPI:
+Install the published v0.4.0 MCP extra from PyPI:
 
 ```bash
 python -m pip install "scan-skill[mcp]==0.4.0"
@@ -269,6 +273,7 @@ src/scan_core/compare.py         Pure deterministic 1.3/1.4 state comparison
 src/scan_core/git_change.py      Local-only advisory Git changed-scope integration
 src/scan_core/reuse.py           Strict evidence freshness/reuse decision engine
 src/scan_core/render.py          Validated canonical-state HTML renderer
+src/scan_core/sarif.py           Deterministic SARIF 2.1.0 finding exporter
 src/scan_core/scanbench.py       ScanBench v1 deterministic harness
 src/scan_core/mcp_server.py      Optional read-only local MCP bridge
 src/scan_core/settings.py        `.scan/config.toml` loader and precedence defaults
@@ -292,6 +297,7 @@ docs/v0.2-technical-spec.md      Approved standalone Scan Core + CLI contract
 docs/v0.2-compatibility.md       Python/schema/config/ScanBench compatibility boundary
 docs/v0.3-technical-spec.md      Approved repeat-scan baseline/diff contract
 docs/v0.4-mcp-foundation.md      Read-only MCP bridge contract
+docs/v0.5-sarif-export.md        SARIF 2.1.0 interoperability contract
 ```
 
 ## Contribute and report security issues

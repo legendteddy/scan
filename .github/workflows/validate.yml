@@ -192,10 +192,11 @@ jobs:
         id: install-wheel
         run: python -c "from pathlib import Path; import subprocess,sys; w=next(Path('wheelhouse').glob('*.whl')); subprocess.check_call([sys.executable,'-m','pip','install','--disable-pip-version-check','--force-reinstall','--no-deps',str(w)])"
 
-      - name: Verify installed console entrypoint
+      - name: Verify installed console entrypoint and SARIF export
         run: |
           scan --version
           scan doctor . --json
+          python -c "import json,pathlib,subprocess,tempfile; d=pathlib.Path(tempfile.mkdtemp()); state=d/'state.json'; sarif=d/'scan.sarif'; subprocess.run(['scan','.', '--offline','--baseline','none','--no-html','--state',str(state),'--quiet'],check=True); subprocess.run(['scan','sarif',str(state),'--output',str(sarif)],check=True); p=json.loads(sarif.read_text(encoding='utf-8')); assert p['version']=='2.1.0' and len(p['runs'])==1 and isinstance(p['runs'][0]['results'],list); print('SARIF_CLI_SMOKE=PASS')"
 
       - name: Install optional MCP extra from built wheel
         run: python -c "from pathlib import Path; import subprocess,sys; w=next(Path('wheelhouse').glob('*.whl')); subprocess.check_call([sys.executable,'-m','pip','install','--disable-pip-version-check',str(w)+'[mcp]'])"
