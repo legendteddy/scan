@@ -7,6 +7,8 @@ import sys
 import tempfile
 import unittest
 
+from scan_core.config import ScanConfig
+from scan_core.core import scan_project
 from scan_core.efficiency_benchmark import (
     BENCHMARK_SCHEMA_VERSION,
     build_efficiency_benchmark,
@@ -122,20 +124,24 @@ class EfficiencyBenchmarkTests(unittest.TestCase):
         self.assertEqual(comparison["token_delta"]["input_tokens"], -600)
         self.assertNotIn("percent", json.dumps(comparison).lower())
 
-    def test_script_runs_from_checkout_against_validated_golden_state(self) -> None:
-        state = ROOT / "tests" / "golden" / "state" / "clean-minimal.json"
-        completed = subprocess.run(
-            [
-                sys.executable,
-                str(ROOT / "scripts" / "benchmark_efficiency.py"),
-                "--run",
-                f"baseline={state}",
-            ],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+    def test_script_runs_from_checkout_against_current_validated_state(self) -> None:
+        target = ROOT / "scanbench" / "fixtures" / "clean-minimal" / "project"
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "state.json"
+            scan_project(ScanConfig(root=target, output_state=state, baseline_mode="none"))
+            self.assertTrue(state.exists())
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts" / "benchmark_efficiency.py"),
+                    "--run",
+                    f"baseline={state}",
+                ],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
         self.assertEqual(completed.returncode, 0, completed.stderr)
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["schema_version"], BENCHMARK_SCHEMA_VERSION)
