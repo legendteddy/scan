@@ -1,4 +1,4 @@
-﻿"""Local-only Git changed-scope context for Scan v0.3.
+"""Local-only Git changed-scope context for Scan v0.3.
 
 This module never fetches or contacts remotes. Git output is advisory context only;
 Scan's filesystem inventory remains the authoritative project accounting layer.
@@ -35,6 +35,15 @@ class GitChangeScope:
     untracked: tuple[str, ...] = ()
     limitations: tuple[str, ...] = ()
 
+    def priority_paths(self) -> tuple[str, ...]:
+        """Return current changed paths worth inspecting first, without implying coverage."""
+        paths = set(self.added) | set(self.modified) | set(self.untracked)
+        for row in (*self.renamed, *self.copied):
+            destination = row.get("to")
+            if isinstance(destination, str) and destination:
+                paths.add(destination)
+        return tuple(sorted(path for path in paths if path))
+
     def as_dict(self) -> dict[str, object]:
         return {
             "base_ref": self.base_ref,
@@ -46,6 +55,7 @@ class GitChangeScope:
             "renamed": [dict(row) for row in self.renamed],
             "copied": [dict(row) for row in self.copied],
             "untracked": list(self.untracked),
+            "priority_paths": list(self.priority_paths()),
             "limitations": list(self.limitations),
         }
 
@@ -209,6 +219,7 @@ def inspect_git_change_scope(
             "Tracked categories compare base_ref to the current local working tree, including committed, staged and unstaged changes",
             "Ignored files are not enumerated by Git change scope and remain governed by Scan inventory/configuration",
             "Rename/copy detection does not alter Scan path-derived artifact identity or baseline delta categories",
+            "priority_paths only consolidates current changed paths for semantic ordering; it is not a dependency, import or call graph",
             "No Git fetch or remote network operation was performed",
         ),
     )
