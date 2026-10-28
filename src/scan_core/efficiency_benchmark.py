@@ -81,11 +81,51 @@ def load_host_usage(path: str | Path) -> dict[str, Any]:
     return dict(payload)
 
 
+def summarize_semantic_work(receipt: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Summarize validated host-reported semantic work without upgrading coverage."""
+    if receipt is None:
+        return {"available": False}
+
+    producer = _mapping(receipt.get("producer"))
+    rows = _rows(receipt.get("artifacts"))
+    fresh = [row for row in rows if row.get("action") == "fresh_read"]
+    reused = [row for row in rows if row.get("action") == "verified_reuse"]
+
+    def accesses(items: Sequence[Mapping[str, Any]]) -> int:
+        return sum(
+            int(row.get("access_count", 1))
+            for row in items
+            if isinstance(row.get("access_count", 1), int) and not isinstance(row.get("access_count", 1), bool)
+        )
+
+    fresh_accesses = accesses(fresh)
+    reuse_accesses = accesses(reused)
+    return {
+        "available": True,
+        "source": "host-reported",
+        "schema_version": receipt.get("schema_version"),
+        "producer": {
+            key: producer[key]
+            for key in ("name", "model", "version")
+            if isinstance(producer.get(key), str)
+        },
+        "artifact_count": len(rows),
+        "fresh_read_artifact_count": len(fresh),
+        "fresh_read_access_count": fresh_accesses,
+        "repeat_fresh_read_access_count": max(0, fresh_accesses - len(fresh)),
+        "verified_reuse_artifact_count": len(reused),
+        "verified_reuse_access_count": reuse_accesses,
+        "fresh_read_artifact_ids": [str(row.get("artifact_id")) for row in fresh],
+        "verified_reuse_artifact_ids": [str(row.get("artifact_id")) for row in reused],
+    }
+
+
 def summarize_efficiency(
     state: Mapping[str, Any],
     *,
     label: str,
     usage: Mapping[str, Any] | None = None,
+    work: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Summarize one canonical Scan run using evidence already present in state."""
     if not isinstance(label, str) or not label.strip():
@@ -178,6 +218,7 @@ def summarize_efficiency(
             "deleted_paths_count": deleted_count,
         },
         "host_usage": normalize_host_usage(usage),
+        "semantic_work": summarize_semantic_work(work),
     }
 
 
@@ -187,6 +228,8 @@ def compare_efficiency_runs(baseline: Mapping[str, Any], candidate: Mapping[str,
     after_evidence = _mapping(candidate.get("evidence"))
     before_usage = _mapping(baseline.get("host_usage"))
     after_usage = _mapping(candidate.get("host_usage"))
+    before_work = _mapping(baseline.get("semantic_work"))
+    after_work = _mapping(candidate.get("semantic_work"))
 
     common_token_fields = [
         key for key in _TOKEN_FIELDS
@@ -202,6 +245,31 @@ def compare_efficiency_runs(baseline: Mapping[str, Any], candidate: Mapping[str,
             and before_usage.get("model") == after_usage.get("model")
         )
 
+    semantic_work_comparable = bool(before_work.get("available")) and bool(after_work.get("available"))
+    work_producer_match: bool | None = None
+    if semantic_work_comparable:
+        before_producer = _mapping(before_work.get("producer"))
+        after_producer = _mapping(after_work.get("producer"))
+        comparable_keys = [
+            key for key in ("name", "model", "version")
+            if isinstance(before_producer.get(key), str) and isinstance(after_producer.get(key), str)
+        ]
+        if comparable_keys:
+            work_producer_match = all(before_producer.get(key) == after_producer.get(key) for key in comparable_keys)
+
+    semantic_fields = (
+        "artifact_count",
+        "fresh_read_artifact_count",
+        "fresh_read_access_count",
+        "repeat_fresh_read_access_count",
+        "verified_reuse_artifact_count",
+        "verified_reuse_access_count",
+    )
+    semantic_work_delta = {
+        key: int(after_work.get(key, 0)) - int(before_work.get(key, 0))
+        for key in semantic_fields
+    } if semantic_work_comparable else {}
+
     comparison: dict[str, Any] = {
         "baseline_label": baseline.get("label"),
         "candidate_label": candidate.get("label"),
@@ -216,6 +284,9 @@ def compare_efficiency_runs(baseline: Mapping[str, Any], candidate: Mapping[str,
             key: int(after_usage[key]) - int(before_usage[key])
             for key in common_token_fields
         },
+        "semantic_work_comparable": semantic_work_comparable,
+        "semantic_work_producer_match": work_producer_match,
+        "semantic_work_delta": semantic_work_delta,
     }
     return comparison
 
@@ -234,6 +305,7 @@ def build_efficiency_benchmark(runs: Sequence[Mapping[str, Any]]) -> dict[str, A
         "comparisons": [compare_efficiency_runs(baseline, row) for row in runs[1:]],
         "interpretation": {
             "token_counts": "Only exact host-reported usage is included; absent usage remains unavailable.",
+            "semantic_work": "Semantic-work receipts are host-reported telemetry bound to canonical Scan artifacts; they do not prove semantic correctness or coverage.",
             "coverage": "Lower work counts never upgrade partial coverage or prove equal finding quality.",
             "percent_savings": "Not calculated by this harness; measure and review raw counts before making a savings claim.",
         },
