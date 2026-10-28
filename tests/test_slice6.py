@@ -10,7 +10,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from scan_core import ScanConfig, build_egress_preview, canonical_state_json, scan_project, schema_object
+from scan_core import ScanConfig, __version__, build_egress_preview, canonical_state_json, scan_project, schema_object
 from scan_core.cli import main
 from scan_core.errors import ExitCode
 from scan_core.scanbench import DIMENSIONS, _lock_file, format_bench, run_bench
@@ -53,6 +53,19 @@ def _normalize_golden_state(state):
     return value
 
 
+def _normalize_release_version(state):
+    value = deepcopy(state)
+    value["run"]["scan_version"] = "<release-version>"
+    for row in value["provenance"]["tool_versions"]:
+        if row.get("kind") == "scan-core" and row.get("name") == "scan-core":
+            row["version"] = "<release-version>"
+    for row in value["evidence"]:
+        producer = row.get("producer")
+        if isinstance(producer, dict) and producer.get("kind") == "scan-core" and producer.get("name") == "scan-core":
+            producer["version"] = "<release-version>"
+    return value
+
+
 class ScanBenchReleaseTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -84,7 +97,18 @@ class ScanBenchReleaseTests(unittest.TestCase):
         root = BENCH / "fixtures" / "clean-minimal" / "project"
         actual = _normalize_golden_state(scan_project(ScanConfig(root=root)).state)
         expected = json.loads((ROOT / "tests" / "golden" / "state" / "clean-minimal.json").read_text(encoding="utf-8"))
-        self.assertEqual(actual, expected)
+        self.assertEqual(actual["run"]["scan_version"], __version__)
+        self.assertTrue(all(
+            row["version"] == __version__
+            for row in actual["provenance"]["tool_versions"]
+            if row.get("kind") == "scan-core" and row.get("name") == "scan-core"
+        ))
+        self.assertTrue(all(
+            row["producer"]["version"] == __version__
+            for row in actual["evidence"]
+            if row.get("producer", {}).get("kind") == "scan-core" and row.get("producer", {}).get("name") == "scan-core"
+        ))
+        self.assertEqual(_normalize_release_version(actual), _normalize_release_version(expected))
 
     def test_single_fixture_does_not_fake_unexercised_dimension_passes(self):
         result = run_bench(fixture="hidden-files", bench_root=BENCH)
