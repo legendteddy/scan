@@ -85,7 +85,7 @@ Scan now includes a reusable composite `action.yml` for CI-native inspection. It
     redact: standard
 ```
 
-The action exposes absolute paths for `state`, `report`, `sarif`, and `summary`, plus counts for findings, unknowns, checks and artifacts. Upload/retention and GitHub code-scanning permissions remain explicit workflow-owner decisions. See [the v0.5 GitHub Action contract](docs/v0.5-github-action.md).
+The action exposes absolute paths for `state`, `report`, `sarif`, and `summary`, plus counts for findings, unknowns, checks and artifacts. When given an explicit validated baseline state it also emits honest PR-delta outputs for artifact, finding, and unknown changes; delta counts remain blank when no comparison exists. Upload/retention and GitHub code-scanning permissions remain explicit workflow-owner decisions. See [the v0.5 GitHub Action contract](docs/v0.5-github-action.md).
 
 ### Scan modes
 
