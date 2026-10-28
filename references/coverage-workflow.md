@@ -11,6 +11,18 @@
 
 Fetching, hashing, keyword searching or parsing a file does not establish semantic analysis. Mark content_read or partial until its relevant behavior/content and connections have been examined. For generated duplicates, document exact equivalence and the substantive analysis being transferred; do not silently skip them. Test source establishes intended assertions, not current passing behavior.
 
+## Spend semantic effort before spending more context
+
+For repeat scans and change-focused work, use the cheapest trustworthy context before reading more source:
+
+1. Consume canonical `delta` first when a validated baseline comparison is available.
+2. If `extensions.git_change_scope.priority_paths` is present, inspect those current changed paths early. It is only deterministic prioritization context; it does not establish dependencies, semantic impact or completeness.
+3. Reuse prior semantic evidence only through Scan's existing verified-reuse gates. Do not send unchanged bytes back through the same semantic check merely to recreate equivalent evidence.
+4. Freshly inspect changed artifacts and then trace only the connected consequential paths needed to understand their effects. Record inferred connections as inferred; do not manufacture a dependency graph from filenames or directory proximity.
+5. In `deep`, continue through the remaining safely readable first-party scope after prioritized work. Efficiency may change order and avoid redundant semantic work, but it must not silently narrow whole-project coverage.
+
+Do not invent universal numeric token budgets or claim savings that were not measured for the actual host/model. If a real context, time, access, privacy or resource boundary prevents finishing a requested `deep` scan, stop with explicit partial coverage and prioritized remaining work rather than treating the budget as evidence of completion.
+
 ## Preserve the original depth of reused evidence
 
 Open the prior report's actual artifact record and supporting evidence. Match the source identity, original method, inspected ranges/depth, timestamp and limitations. Keep the substantive evidence in the new HTML.
