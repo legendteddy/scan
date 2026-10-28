@@ -7,12 +7,17 @@ import json
 from pathlib import Path
 import sys
 
-from scan_core.efficiency_benchmark import (
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from scan_core.efficiency_benchmark import (  # noqa: E402
     build_efficiency_benchmark,
     load_host_usage,
     summarize_efficiency,
 )
-from scan_core.validate import validate_path
+from scan_core.validate import validate_path  # noqa: E402
 
 
 def _spec(value: str, *, flag: str) -> tuple[str, Path]:
