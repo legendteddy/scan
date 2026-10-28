@@ -11,7 +11,7 @@ Scan is an **evidence-backed whole-project inspection** project with two layers:
 
 ## Start here: run Scan locally
 
-The v0.3 implementation is **not published to PyPI yet**. Install from a source checkout so the command and bundled evidence assets come from the exact code you reviewed:
+Install from a source checkout when you want the command and bundled evidence assets from the exact repository state you reviewed:
 
 ```bash
 git clone https://github.com/legendteddy/scan.git
@@ -29,7 +29,7 @@ scan . --offline
 
 The second run uses the previous local `.scan/state.json` as its baseline and reports what was added, changed, removed or unchanged, while keeping fresh and reused evidence separate. `scan doctor .` is an offline, non-destructive readiness diagnostic: it checks installed package assets, target access and optional Git support, and uses a temporary local output probe that it removes before returning. It does not install, repair or contact anything.
 
-Registry commands such as `pipx install scan-skill` or `uv tool install scan-skill` are intentionally **not** presented as current installation instructions until a registry package is actually published.
+For published builds, package-index availability depends on the release channel. If `scan-skill` is available in your configured Python package index, you can install the packaged CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`.
 
 ## What makes Scan different?
 

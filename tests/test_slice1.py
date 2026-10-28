@@ -7,6 +7,7 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import tomllib
 import unittest
 
 from scan_core import ScanConfig, __version__
@@ -19,8 +20,10 @@ DEMO = ROOT / "examples" / "demo-report.html"
 
 
 class SliceOneTests(unittest.TestCase):
-    def test_version_is_current_development_release(self):
-        self.assertEqual(__version__, "0.3.0")
+    def test_canonical_package_and_runtime_versions_agree(self):
+        metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        self.assertEqual(metadata["project"]["version"], "0.3.1")
+        self.assertEqual(__version__, metadata["project"]["version"])
 
     def test_scan_config_normalizes_root_to_path(self):
         self.assertEqual(ScanConfig(root=".").root, Path("."))
