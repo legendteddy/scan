@@ -38,7 +38,7 @@ def git(root: Path, *args: str) -> str:
 
 def main() -> int:
     version = scan("--version", capture=True).strip()
-    if "0.3.0.dev6" not in version:
+    if version.strip() != "scan 0.3.0":
         raise AssertionError(f"unexpected installed CLI version: {version}")
 
     with tempfile.TemporaryDirectory() as directory:
