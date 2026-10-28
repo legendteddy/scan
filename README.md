@@ -181,6 +181,23 @@ Expected: the example report passes the structural contract, the generated HTML 
 
 The validator verifies schema, typed references, evidence origins and coverage accounting. A **PASS is not a factual audit, a runtime test or a security guarantee**.
 
+## Optional MCP bridge (v0.4 development)
+
+The v0.4 development line adds a local, read-only MCP bridge so compatible AI hosts can use Scan Core without manually translating the CLI/state contract. The base package remains dependency-free; MCP is an optional extra.
+
+From a v0.4 source checkout:
+
+```bash
+pip install -e ".[mcp]"
+scan-mcp /path/to/project
+```
+
+The MCP server uses local stdio by default and exposes a snapshot summary, explicit refresh, paginated inventory, canonical Scan state, bounded redacted artifact reads, a trust-boundary resource and an evidence-discipline review prompt. Each coverage mode keeps one in-memory server snapshot so inventory pages and reads stay consistent; `scan_refresh` rebuilds it when current bytes are needed. The project root is fixed at server startup; tool calls cannot broaden it. Artifact text reads reject traversal and unsafe link/reparse paths, verify bytes against the cached snapshot digest, enforce byte ceilings, block configured sensitive paths and apply Scan redaction before returning text. A changed file returns `stale` until the snapshot is refreshed.
+
+The Scan MCP process performs no network egress and does not execute target code or write `.scan` output into the target. **The connected MCP host/model is a separate trust boundary** and may transmit tool results according to its own architecture and policy. A deep MCP-backed review is still semantic work performed by the agent; the deterministic Core does not turn unassessed checks into passes.
+
+See [the v0.4 MCP foundation contract](docs/v0.4-mcp-foundation.md) for the exact scope and non-goals. This section describes development work and is not a claim that the current v0.3.1 PyPI package already contains the MCP bridge.
+
 ## Install as an agent skill
 
 Scan also remains an instruction-based agent skill. Copy or clone this repository into the skill directory used by your compatible agent, then ask the agent to inspect a target.
@@ -238,6 +255,7 @@ src/scan_core/git_change.py      Local-only advisory Git changed-scope integrati
 src/scan_core/reuse.py           Strict evidence freshness/reuse decision engine
 src/scan_core/render.py          Validated canonical-state HTML renderer
 src/scan_core/scanbench.py       ScanBench v1 deterministic harness
+src/scan_core/mcp_server.py      Optional read-only local MCP bridge (v0.4 development)
 src/scan_core/settings.py        `.scan/config.toml` loader and precedence defaults
 src/scan_core/schemas/           Bundled structural schemas 1.2, 1.3 and 1.4
 src/scan_core/report/shell.html  Packaged self-contained report shell
@@ -258,6 +276,7 @@ launch/launch-kit.md             Draft launch copy and approval checklist
 docs/v0.2-technical-spec.md      Approved standalone Scan Core + CLI contract
 docs/v0.2-compatibility.md       Python/schema/config/ScanBench compatibility boundary
 docs/v0.3-technical-spec.md      Approved repeat-scan baseline/diff contract
+docs/v0.4-mcp-foundation.md      Read-only MCP bridge development contract
 ```
 
 ## Contribute and report security issues
