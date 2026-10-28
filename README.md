@@ -29,7 +29,7 @@ scan . --offline
 
 The second run uses the previous local `.scan/state.json` as its baseline and reports what was added, changed, removed or unchanged, while keeping fresh and reused evidence separate. `scan doctor .` is an offline, non-destructive readiness diagnostic: it checks installed package assets, target access and optional Git support, and uses a temporary local output probe that it removes before returning. It does not install, repair or contact anything.
 
-For published builds, package-index availability depends on the release channel. If `scan-skill` is available in your configured Python package index, you can install the packaged CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`.
+When Scan 0.4.0 is published to PyPI, install the packaged CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`. Pin `scan-skill==0.4.0` when you need the exact release.
 
 ## What makes Scan different?
 
@@ -149,7 +149,7 @@ semantic_state = builder.build()
 
 ### Evidence freshness and safe reuse
 
-Every run rebuilds the current inventory, hashes and provenance evidence fresh. Prior **higher-level static evidence** is considered for reuse only when its artifact/content identity is unchanged, its producer and producer version exactly match an available current producer, its check identity/definition still matches, its evidence class is explicitly reusable, and the current privacy policy can represent it safely. Runtime, observed, deployment/live-state and time-sensitive evidence is never automatically reused in v0.3.
+Every run rebuilds the current inventory, hashes and provenance evidence fresh. Prior **higher-level static evidence** is considered for reuse only when its artifact/content identity is unchanged, its producer and producer version exactly match an available current producer, its check identity/definition still matches, its evidence class is explicitly reusable, and the current privacy policy can represent it safely. Runtime, observed, deployment/live-state and time-sensitive evidence is never automatically reused.
 
 New semantic evidence created through `SemanticStateBuilder` is marked fresh. Reused evidence retains its original observation time, depth and limitations and is marked `verified_reuse`; it never upgrades `content_read` to `analyzed`, an unfinished check to assessed, or static evidence to runtime verification. The state and HTML report expose fresh, reused and rejected-reuse counts separately. Current redaction/sensitive-path policy always wins over older baseline content.
 
@@ -158,6 +158,8 @@ New semantic evidence created through `SemanticStateBuilder` is marked fresh. Re
 `scan bench` runs 12 mandatory synthetic adversarial fixtures covering hidden files, escaping symlinks, prompt injection, redaction, hostile filenames, unreadable content, archives, unsupported binaries, generated/vendor files, resource boundaries and false runtime claims. Results are reported separately for **inventory completeness, state integrity, evidence correctness, privacy integrity, and safety-boundary compliance**. ScanBench deliberately does **not** calculate a blended quality score.
 
 Run one fixture with `scan bench FIXTURE`. The installed wheel carries the same canonical fixture data, so this works outside the source checkout as well.
+
+The v0.4 line also includes a separate **Agent-Honesty** contract benchmark. It deterministically checks that Scan does not upgrade weak evidence into five stronger claims: tests exist ≠ tests passed, inventory ≠ semantic review, static evidence ≠ runtime verification, unchanged bytes ≠ freshly reviewed evidence, and missing findings/evidence ≠ safe. It is a contract gate, not an AI intelligence or honesty score.
 
 ![Screenshot of the synthetic Pocket Ledger Scan report, showing coverage and explicit unknowns](assets/demo-preview.png)
 
@@ -181,22 +183,35 @@ Expected: the example report passes the structural contract, the generated HTML 
 
 The validator verifies schema, typed references, evidence origins and coverage accounting. A **PASS is not a factual audit, a runtime test or a security guarantee**.
 
-## Optional MCP bridge (v0.4 development)
+## Optional MCP bridge (v0.4)
 
-The v0.4 development line adds a local, read-only MCP bridge so compatible AI hosts can use Scan Core without manually translating the CLI/state contract. The base package remains dependency-free; MCP is an optional extra.
+Scan v0.4 adds a local, read-only MCP bridge so compatible AI hosts can use Scan Core without manually translating the CLI/state contract. The base package remains dependency-free; MCP is an optional extra.
 
-From a v0.4 source checkout:
+After v0.4.0 is published to PyPI:
 
 ```bash
-pip install -e ".[mcp]"
+python -m pip install "scan-skill[mcp]==0.4.0"
+scan-mcp doctor /path/to/project
 scan-mcp /path/to/project
 ```
 
+From an exact source checkout:
+
+```bash
+python -m pip install -e ".[mcp]"
+scan-mcp doctor /path/to/project
+scan-mcp /path/to/project
+```
+
+`scan-mcp config` can generate host-ready launch configuration using the absolute Python interpreter and project path, which avoids relying on shell activation or a full host `PATH`. The generator supports the documented Codex, Claude Desktop, Claude Code, Cursor and VS Code host shapes and does not modify host configuration automatically.
+
 The MCP server uses local stdio by default and exposes a snapshot summary, explicit refresh, paginated inventory, canonical Scan state, bounded redacted artifact reads, a trust-boundary resource and an evidence-discipline review prompt. Each coverage mode keeps one in-memory server snapshot so inventory pages and reads stay consistent; `scan_refresh` rebuilds it when current bytes are needed. The project root is fixed at server startup; tool calls cannot broaden it. Artifact text reads reject traversal and unsafe link/reparse paths, verify bytes against the cached snapshot digest, enforce byte ceilings, block configured sensitive paths and apply Scan redaction before returning text. A changed file returns `stale` until the snapshot is refreshed.
+
+The MCP application also exposes bounded **semantic continuation** tied to that snapshot. An agent can add evidence-linked semantic records in a separate in-memory workspace, validate canonical Scan 1.4 state, and render a self-contained report without modifying the inspected project. Evidence is bound to current artifact bytes, invalid mutations roll back, stale snapshots block further semantic writes, and static semantic work cannot be upgraded into observed/runtime claims without separate runtime evidence.
 
 The Scan MCP process performs no network egress and does not execute target code or write `.scan` output into the target. **The connected MCP host/model is a separate trust boundary** and may transmit tool results according to its own architecture and policy. A deep MCP-backed review is still semantic work performed by the agent; the deterministic Core does not turn unassessed checks into passes.
 
-See [the v0.4 MCP foundation contract](docs/v0.4-mcp-foundation.md) for the exact scope and non-goals. This section describes development work and is not a claim that the current v0.3.1 PyPI package already contains the MCP bridge.
+See [the v0.4 MCP foundation contract](docs/v0.4-mcp-foundation.md) for the exact scope and non-goals.
 
 ## Install as an agent skill
 
@@ -247,15 +262,15 @@ Optional visual QA and screenshot refresh: `python scripts/capture_preview.py` (
 
 ```text
 SKILL.md                         Agent instructions and safety boundaries
-pyproject.toml                   Scan Core package metadata and `scan` entry point
-src/scan_core/                   v0.3 deterministic core package
+pyproject.toml                   Scan Core package metadata and `scan` / `scan-mcp` entry points
+src/scan_core/                   Deterministic Scan Core package
 src/scan_core/baseline.py        Local-only bounded baseline resolver
 src/scan_core/compare.py         Pure deterministic 1.3/1.4 state comparison
 src/scan_core/git_change.py      Local-only advisory Git changed-scope integration
 src/scan_core/reuse.py           Strict evidence freshness/reuse decision engine
 src/scan_core/render.py          Validated canonical-state HTML renderer
 src/scan_core/scanbench.py       ScanBench v1 deterministic harness
-src/scan_core/mcp_server.py      Optional read-only local MCP bridge (v0.4 development)
+src/scan_core/mcp_server.py      Optional read-only local MCP bridge
 src/scan_core/settings.py        `.scan/config.toml` loader and precedence defaults
 src/scan_core/schemas/           Bundled structural schemas 1.2, 1.3 and 1.4
 src/scan_core/report/shell.html  Packaged self-contained report shell
@@ -276,7 +291,7 @@ launch/launch-kit.md             Draft launch copy and approval checklist
 docs/v0.2-technical-spec.md      Approved standalone Scan Core + CLI contract
 docs/v0.2-compatibility.md       Python/schema/config/ScanBench compatibility boundary
 docs/v0.3-technical-spec.md      Approved repeat-scan baseline/diff contract
-docs/v0.4-mcp-foundation.md      Read-only MCP bridge development contract
+docs/v0.4-mcp-foundation.md      Read-only MCP bridge contract
 ```
 
 ## Contribute and report security issues
