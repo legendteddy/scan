@@ -17,6 +17,15 @@ from scan_core.mcp_cli import (
 )
 
 
+def _supported_mcp_sdk_installed() -> bool:
+    if importlib.util.find_spec("mcp") is None:
+        return False
+    try:
+        return int(metadata.version("mcp").split(".", 1)[0]) == 2
+    except (metadata.PackageNotFoundError, ValueError):
+        return False
+
+
 class MCPSetupTests(unittest.TestCase):
     def _project(self, root: Path) -> None:
         (root / "README.md").write_text("# Demo\n", encoding="utf-8")
@@ -76,7 +85,7 @@ class MCPSetupTests(unittest.TestCase):
             self.assertEqual(checks["core-snapshot"].status, "pass")
             self.assertFalse((root / ".scan").exists())
 
-    @unittest.skipUnless(importlib.util.find_spec("mcp"), "install the MCP extra for the live doctor gate")
+    @unittest.skipUnless(_supported_mcp_sdk_installed(), "install the supported MCP 2.x extra for the live doctor gate")
     def test_doctor_passes_with_installed_supported_sdk(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
