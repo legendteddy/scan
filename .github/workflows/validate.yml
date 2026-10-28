@@ -198,6 +198,30 @@ jobs:
           scan doctor . --json
           python -c "import json,pathlib,subprocess,tempfile; d=pathlib.Path(tempfile.mkdtemp()); state=d/'state.json'; sarif=d/'scan.sarif'; subprocess.run(['scan','.', '--offline','--baseline','none','--no-html','--state',str(state),'--quiet'],check=True); subprocess.run(['scan','sarif',str(state),'--output',str(sarif)],check=True); p=json.loads(sarif.read_text(encoding='utf-8')); assert p['version']=='2.1.0' and len(p['runs'])==1 and isinstance(p['runs'][0]['results'],list); print('SARIF_CLI_SMOKE=PASS')"
 
+      - name: Verify installed SARIF import adapter
+        shell: python
+        run: |
+          import json
+          from pathlib import Path
+          import subprocess
+          import tempfile
+          root = Path(tempfile.mkdtemp())
+          project = root / "project"
+          project.mkdir()
+          (project / "app.py").write_text("print('ok')\n", encoding="utf-8")
+          state = root / "state.json"
+          external = root / "external.sarif"
+          imported = root / "imported.json"
+          report = root / "imported.html"
+          subprocess.run(["scan", str(project), "--offline", "--baseline", "none", "--no-html", "--state", str(state), "--quiet"], check=True)
+          external.write_text(json.dumps({"version":"2.1.0","runs":[{"tool":{"driver":{"name":"CIExample","semanticVersion":"1.0","rules":[{"id":"EXT001","shortDescription":{"text":"External finding"}}]}},"results":[{"ruleId":"EXT001","ruleIndex":0,"level":"warning","message":{"text":"External static result"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"app.py"},"region":{"startLine":1}}}]}]}]}), encoding="utf-8")
+          subprocess.run(["scan", "import-sarif", str(state), str(external), "--output", str(imported), "--report", str(report), "--json"], check=True)
+          payload = json.loads(imported.read_text(encoding="utf-8"))
+          assert len(payload["findings"]) == 1
+          assert any(row["producer"]["kind"] == "external-tool" for row in payload["evidence"])
+          assert report.is_file()
+          print("SARIF_IMPORT_CLI_SMOKE=PASS")
+
       - name: Verify reusable GitHub Action receipts
         id: scan-action
         uses: ./
