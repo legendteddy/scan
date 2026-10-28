@@ -21,6 +21,7 @@ from .builder import (
 from .compare import Comparison, compare_states
 from .config import ScanConfig, ScanResult
 from .core import scan_project
+from .doctor import DoctorCheck, DoctorResult, run_doctor
 from .inventory import InventoryArtifact, InventoryResult, build_inventory
 from .privacy import (
     EgressPreview,
@@ -49,6 +50,8 @@ __all__ = [
     "CheckRecord",
     "ComponentRecord",
     "ControlRecord",
+    "DoctorCheck",
+    "DoctorResult",
     "Comparison",
     "EgressPreview",
     "EvidenceRecord",
@@ -83,6 +86,7 @@ __all__ = [
     "render_html",
     "render_report",
     "run_bench",
+    "run_doctor",
     "scan_project",
     "schema_object",
     "schema_text",

@@ -12,6 +12,7 @@ from .baseline import load_state_file
 from .compare import compare_states
 from .config import ScanConfig
 from .core import scan_project
+from .doctor import format_doctor, run_doctor
 from .errors import (
     CommandError,
     CoverageThresholdError,
@@ -30,7 +31,7 @@ from .settings import load_project_settings
 from .validate import validate_path
 from .version import __version__
 
-UTILITY_COMMANDS = {"validate", "render", "bench", "schema", "egress", "compare"}
+UTILITY_COMMANDS = {"validate", "render", "bench", "schema", "egress", "compare", "doctor"}
 
 
 def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool) -> None:
@@ -75,6 +76,9 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
         parser.add_argument("--json", action="store_true")
     elif command == "schema":
         parser.add_argument("--version", choices=("1.2", "1.3", "1.4"), default="1.4")
+    elif command == "doctor":
+        parser.add_argument("path", nargs="?", type=Path, default=Path("."))
+        parser.add_argument("--json", action="store_true")
     elif command == "compare":
         parser.add_argument("old_state", type=Path)
         parser.add_argument("new_state", type=Path)
@@ -176,6 +180,13 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
         text = schema_text(args.version)
         print(text, end="" if text.endswith("\n") else "\n")
         return int(ExitCode.OK)
+    if command == "doctor":
+        result = run_doctor(args.path)
+        if args.json:
+            print(json.dumps(result.as_dict(), ensure_ascii=True, sort_keys=True, separators=(",", ":")))
+        else:
+            print(format_doctor(result))
+        return int(ExitCode.OK if result.overall != "fail" else ExitCode.COMMAND_ERROR)
     if command == "compare":
         for path in (args.old_state, args.new_state):
             if not path.exists():

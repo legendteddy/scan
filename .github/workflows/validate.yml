@@ -22,6 +22,22 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Build wheel and source distribution
+        run: |
+          python -m pip install --disable-pip-version-check build
+          python -m build --sdist --wheel --outdir "$RUNNER_TEMP/dist"
+          python -c "from pathlib import Path; import os; d=Path(os.environ['RUNNER_TEMP'])/'dist'; assert len(list(d.glob('*.whl')))==1; assert len(list(d.glob('*.tar.gz')))==1"
+
+      - name: Smoke-test wheel and source distribution installs
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-venv"
+          "$RUNNER_TEMP/wheel-venv/bin/python" -m pip install --disable-pip-version-check "$RUNNER_TEMP"/dist/*.whl
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/scan" doctor "$GITHUB_WORKSPACE" --json > doctor-wheel.json)
+          python -m venv "$RUNNER_TEMP/sdist-venv"
+          "$RUNNER_TEMP/sdist-venv/bin/python" -m pip install --disable-pip-version-check "$RUNNER_TEMP"/dist/*.tar.gz
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/scan" doctor "$GITHUB_WORKSPACE" --json > doctor-sdist.json)
+          python -c "import json,os; from pathlib import Path; r=Path(os.environ['RUNNER_TEMP']); assert json.load(open(r/'doctor-wheel.json'))['overall'] in ('pass','warn'); assert json.load(open(r/'doctor-sdist.json'))['overall'] in ('pass','warn')"
+
       - name: Install Scan package
         run: python -m pip install --disable-pip-version-check .
 
@@ -39,6 +55,8 @@ jobs:
       - name: Verify packaged CLI
         run: |
           scan --version
+          scan doctor . --json > "$RUNNER_TEMP/doctor.json"
+          python -c "import json,sys; d=json.load(open(sys.argv[1], encoding='utf-8')); assert d['overall'] in ('pass','warn'); assert any(c['id']=='schema-1.4' and c['status']=='pass' for c in d['checks'])" "$RUNNER_TEMP/doctor.json"
           scan validate examples/demo-report.html
           scan scanbench/fixtures/inventory-basic/target --offline --state "$RUNNER_TEMP/scan-state.json" --output "$RUNNER_TEMP/scan-report.html" --quiet
           scan validate "$RUNNER_TEMP/scan-state.json"
