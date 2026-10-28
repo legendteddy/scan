@@ -14,6 +14,7 @@ import tempfile
 from typing import Any
 
 from .errors import SourceError
+from .scanbench import locate_scanbench_root
 from .schema import schema_object
 from .version import __version__
 
@@ -99,7 +100,7 @@ def _report_asset_check() -> DoctorCheck:
 
 def _scanbench_asset_check() -> DoctorCheck:
     try:
-        root = files("scanbench_data")
+        root = locate_scanbench_root()
         manifest = json.loads(root.joinpath("manifest.json").read_text(encoding="utf-8"))
         fixtures = manifest.get("fixtures")
         if not isinstance(fixtures, list) or not fixtures or not all(isinstance(name, str) and name for name in fixtures):
