@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from collections import Counter
+from dataclasses import asdict
 from datetime import datetime, timezone
+import hashlib
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
 
 from .baseline import BaselineResolution, resolve_baseline
+from .builder import SemanticStateBuilder
 from .compare import Comparison, compare_states
 from .config import ScanConfig, ScanResult
 from .git_change import inspect_git_change_scope
@@ -15,7 +18,7 @@ from .git_provenance import inspect_git_provenance
 from .inventory import build_inventory
 from .privacy import assess_privacy
 from .render import render_report
-from .reuse import ReusePolicy, check_definition_digest, evaluate_reuse, reused_evidence_record
+from .reuse import ReusePolicy, SemanticRegistration, check_definition_digest, evaluate_reuse, reused_evidence_record
 from .snapshot import build_snapshot
 from .state import build_state, canonical_state_json
 from .validate import validate_state
@@ -83,7 +86,7 @@ def _apply_comparison(state: dict, resolution: BaselineResolution, comparison: C
     }
 
 
-def _reuse_policy(state: Mapping[str, Any], config: ScanConfig) -> ReusePolicy:
+def _reuse_policy(state: Mapping[str, Any], config: ScanConfig, registrations: tuple[SemanticRegistration, ...]) -> ReusePolicy:
     producers = tuple(
         (str(row.get("kind")), str(row.get("name")), str(row.get("version")))
         for row in state["provenance"]["tool_versions"]
@@ -96,10 +99,17 @@ def _reuse_policy(state: Mapping[str, Any], config: ScanConfig) -> ReusePolicy:
         check_definitions=checks,
         redaction_level=config.redaction_level,
         sensitive_path_patterns=config.sensitive_paths,
+        producer_checks=tuple(
+            (producer, ident, digest)
+            for producer in producers if producer not in {registration.producer for registration in registrations}
+            for ident, digest in checks
+        ) + tuple((registration.producer, check.id, check.digest)
+                  for registration in registrations for check in registration.checks),
     )
 
 
-def _apply_reuse(state: dict[str, Any], previous: Mapping[str, Any], config: ScanConfig, reused_at: str) -> None:
+def _apply_reuse(state: dict[str, Any], previous: Mapping[str, Any], config: ScanConfig, reused_at: str,
+                 registrations: tuple[SemanticRegistration, ...] = ()) -> None:
     """Copy only explicitly reuse-aware higher-level evidence that passes every gate."""
     baseline = state["baseline"]
     if not config.reuse_enabled:
@@ -109,7 +119,7 @@ def _apply_reuse(state: dict[str, Any], previous: Mapping[str, Any], config: Sca
     source_state_digest = baseline["source_state_digest"]
     if not isinstance(source_state_digest, str):
         return
-    policy = _reuse_policy(state, config)
+    policy = _reuse_policy(state, config, registrations)
     current_artifacts = {row["id"]: row for row in state["artifacts"]}
     previous_artifacts = {row["id"]: row for row in previous.get("artifacts", []) if isinstance(row, Mapping)}
     previous_checks = {row["id"]: row for row in previous.get("checks", []) if isinstance(row, Mapping)}
@@ -184,7 +194,46 @@ def _apply_reuse(state: dict[str, Any], previous: Mapping[str, Any], config: Sca
     baseline["rejected_reuse_reasons"] = dict(sorted(rejected.items()))
 
 
-def scan_project(config: ScanConfig) -> ScanResult:
+def _register_semantic_invocation(state: dict[str, Any], registrations: tuple[SemanticRegistration, ...]) -> dict[str, Any]:
+    if not registrations:
+        return state
+    builder = SemanticStateBuilder(state)
+    definitions: dict[str, str] = {}
+    builtin_producers = {(row['kind'], row['name'], row['version']) for row in state['provenance']['tool_versions']}
+    for registration in registrations:
+        if not isinstance(registration, SemanticRegistration):
+            raise ValueError("Expected explicit SemanticRegistration from the current invocation")
+        if registration.producer[:2] in {producer[:2] for producer in builtin_producers}:
+            raise ValueError("Semantic registration cannot impersonate a built-in producer")
+        producer = dict(zip(('kind', 'name', 'version'), registration.producer))
+        if producer not in builder.state['provenance']['tool_versions']:
+            builder.state['provenance']['tool_versions'].append(producer)
+        for check in registration.checks:
+            if check.id in definitions and definitions[check.id] != check.digest:
+                raise ValueError("Conflicting current semantic check definitions")
+            definitions[check.id] = check.digest
+            definition = asdict(check)
+            definition.pop('id')
+            definition.update(status='not_assessed', artifact_ids=[], evidence_ids=[], related_ids=[],
+                              verification_state='unverified', result='Current semantic assessment not performed',
+                              limitations='Registration authorizes compatibility checks only; no depth or coverage upgrade',
+                              reason='Current invocation registered this check definition', next_step='Assess current scope with evidence')
+            builder.assess_check(record_id=check.id, **definition)
+    builder.state['extensions']['semantic_continuation'] = [
+        {'producer': dict(zip(('kind', 'name', 'version'), registration.producer)),
+         'checks': [{'id': check.id, 'definition_digest': check.digest} for check in registration.checks]}
+        for registration in registrations
+    ]
+    builder.state['provenance']['configuration_digest'] = 'sha256:' + hashlib.sha256(
+        canonical_state_json({
+            'core_configuration_digest': state['provenance']['configuration_digest'],
+            'semantic_continuation': builder.state['extensions']['semantic_continuation'],
+        }).encode('utf-8')
+    ).hexdigest()
+    return builder.build()
+
+
+def scan_project(config: ScanConfig, *, semantic_registrations: tuple[SemanticRegistration, ...] = ()) -> ScanResult:
     """Build current state, compare a local baseline, safely reuse evidence, and write outputs."""
     started_at = _utc_now()
     root = Path(config.root).resolve(strict=True)
@@ -198,7 +247,7 @@ def scan_project(config: ScanConfig) -> ScanResult:
     )
 
     tool_owned_omissions = _prepare_output_omissions(config, root)
-    git_provenance = inspect_git_provenance(root)
+    git_provenance = inspect_git_provenance(root, metadata_roots=config.git_metadata_roots)
     git_change_scope = (
         inspect_git_change_scope(root, config.changed_since, sensitive_patterns=config.sensitive_paths)
         if config.changed_since is not None
@@ -221,10 +270,11 @@ def scan_project(config: ScanConfig) -> ScanResult:
         completed_at=completed_at,
         baseline_status=temporary_status,
     )
+    state = _register_semantic_invocation(state, semantic_registrations)
     if resolution.state is not None:
         comparison = compare_states(resolution.state, state)
         _apply_comparison(state, resolution, comparison)
-        _apply_reuse(state, resolution.state, config, completed_at)
+        _apply_reuse(state, resolution.state, config, completed_at, semantic_registrations)
     validate_state(state, version="1.4")
 
     state_path = _write_state(config.output_state, state) if config.output_state is not None else None

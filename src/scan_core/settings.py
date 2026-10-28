@@ -12,6 +12,7 @@ import tomllib
 from typing import Any
 
 from .errors import CommandError
+from .auxiliary import AuxiliaryReadError, read_auxiliary
 
 
 @dataclass(frozen=True)
@@ -55,15 +56,12 @@ def load_project_settings(root: str | Path) -> ProjectSettings:
     """Load optional ``ROOT/.scan/config.toml`` without executing target content."""
     root_path = Path(root)
     path = root_path / ".scan" / "config.toml"
-    if not path.exists():
+    if not path.exists() and not path.is_symlink():
         return ProjectSettings()
-    if not path.is_file():
-        raise CommandError(f"Scan config is not a regular file: {path}")
     try:
-        with path.open("rb") as stream:
-            data = tomllib.load(stream)
-    except (OSError, tomllib.TOMLDecodeError) as error:
-        raise CommandError(f"Cannot read Scan config {path}: {error}") from error
+        data = tomllib.loads(read_auxiliary(root_path, ".scan/config.toml", max_bytes=64_000).decode("utf-8"))
+    except (AuxiliaryReadError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise CommandError(f"Cannot read Scan config safely: {error}") from error
     if not isinstance(data, dict):
         raise CommandError("Scan config root must be a TOML table")
     unknown_top = set(data) - _ALLOWED_TOP

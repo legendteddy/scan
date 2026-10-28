@@ -46,3 +46,7 @@ class ValidationError(ScanError, ValueError):
 
 class UnsupportedSchemaError(ValidationError):
     """The requested Scan state version is not implemented."""
+
+
+class UnsafeReportError(ValidationError):
+    """HTML violates the static, self-contained report safety contract."""

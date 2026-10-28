@@ -107,6 +107,8 @@ max_state_bytes = 64000000
 
 Behavior-affecting resolved configuration is included in the canonical configuration digest. An explicit `--baseline PATH` is invocation-only and is never persisted automatically. Use `--baseline none` to disable comparison for a run; `--no-reuse` records that prior evidence must not be reused. Scan configuration does not require secrets.
 
+See [explicit semantic continuation](references/semantic-continuation.md) for current producer/check registration and bounded worktree metadata authorization. Baselines never authorize their own semantic producers.
+
 ### Semantic builder API
 
 Semantic agents can extend valid deterministic state without hand-authoring nested JSON. `SemanticStateBuilder` provides typed record helpers for components, evidence, relationships, findings, controls, unknowns, actions and checks; scalar/string-array references are normalized, generated IDs are deterministic, and bad references fail with the record ID and field path. The strict Scan validator still runs on `build()`.
@@ -165,17 +167,17 @@ Run one fixture with `scan bench FIXTURE`. The installed wheel carries the same 
 
 ## Historical synthetic proof
 
-You only need **Python 3.9+** to validate the example report; the validator and its tests use the standard library.
+The historical report validator wrapper requires **Python 3.11+**, like Scan Core: it imports the current package (including `tomllib`). The validator and its tests use the standard library. Historical schema compatibility does not imply compatibility with older Python runtimes.
 
-\`\`\`bash
+```bash
 git clone https://github.com/legendteddy/scan.git
 cd scan
 python scripts/validate_report.py examples/demo-report.html
 python scripts/build_demo_report.py --check
 python -m unittest discover -s scripts -p "test_*.py" -v
-\`\`\`
+```
 
-Expected: the example report passes the structural contract, the generated HTML matches the checked-in version, and the validator tests pass. Open \`examples/demo-report.html\` **locally in a browser** to explore it. GitHub's source viewer is not an HTML report host.
+Expected: the example report passes the structural contract, the generated HTML matches the checked-in version, and the validator tests pass. Open `examples/demo-report.html` **locally in a browser** to explore it. GitHub's source viewer is not an HTML report host.
 
 The validator verifies schema, typed references, evidence origins and coverage accounting. A **PASS is not a factual audit, a runtime test or a security guarantee**.
 
@@ -183,29 +185,29 @@ The validator verifies schema, typed references, evidence origins and coverage a
 
 Scan also remains an instruction-based agent skill. Copy or clone this repository into the skill directory used by your compatible agent, then ask the agent to inspect a target.
 
-For environments that discover user skills in \`~/.agents/skills/\`:
+For environments that discover user skills in `~/.agents/skills/`:
 
-\`\`\`bash
+```bash
 mkdir -p ~/.agents/skills
 git clone https://github.com/legendteddy/scan.git ~/.agents/skills/scan
-\`\`\`
+```
 
 On Windows PowerShell:
 
-\`\`\`powershell
+```powershell
 New-Item -ItemType Directory -Force "$HOME\.agents\skills" | Out-Null
 git clone https://github.com/legendteddy/scan.git "$HOME\.agents\skills\scan"
-\`\`\`
+```
 
 Skill locations, invocation and tool access vary by agent. Consult your host's skill documentation; copying a folder alone does not guarantee the host will load it.
 
 Example requests to a compatible agent:
 
-\`\`\`text
+```text
 Scan this entire repository and show what you could not verify.
 Inspect this project and produce an evidence-backed HTML report.
 Use $scan to map this package's architecture, risks and unknowns.
-\`\`\`
+```
 
 The governing instructions are in [SKILL.md](SKILL.md). Scan asks for explicit authorization before running untrusted target code or modifying the inspected target.
 
@@ -215,18 +217,18 @@ The fictional **Pocket Ledger** CSV totaler has five source files. Its worked re
 
 The report's static analysis of the five fixture files is complete **within that narrow scope**, but its broader checks are not complete. That distinction is the point of the demonstration.
 
-To regenerate the sample after editing the fixture, update the snapshot time and evidence anchors in \`scripts/build_demo_report.py\`, then run:
+To regenerate the sample after editing the fixture, update the snapshot time and evidence anchors in `scripts/build_demo_report.py`, then run:
 
-\`\`\`bash
+```bash
 python scripts/build_demo_report.py
 python scripts/validate_report.py examples/demo-report.html
-\`\`\`
+```
 
-Optional visual QA and screenshot refresh: \`python scripts/capture_preview.py\` (requires Playwright and Chromium; not needed for Scan or CI).
+Optional visual QA and screenshot refresh: `python scripts/capture_preview.py` (requires Playwright and Chromium; not needed for Scan or CI).
 
 ## Repository map
 
-\`\`\`text
+```text
 SKILL.md                         Agent instructions and safety boundaries
 pyproject.toml                   Scan Core package metadata and `scan` entry point
 src/scan_core/                   v0.3 deterministic core package
@@ -256,7 +258,7 @@ launch/launch-kit.md             Draft launch copy and approval checklist
 docs/v0.2-technical-spec.md      Approved standalone Scan Core + CLI contract
 docs/v0.2-compatibility.md       Python/schema/config/ScanBench compatibility boundary
 docs/v0.3-technical-spec.md      Approved repeat-scan baseline/diff contract
-\`\`\`
+```
 
 ## Contribute and report security issues
 

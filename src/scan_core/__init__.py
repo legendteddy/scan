@@ -34,7 +34,7 @@ from .privacy import (
     redact_value,
 )
 from .render import render_html, render_report
-from .reuse import ReuseDecision, ReusePolicy, evaluate_reuse
+from .reuse import ReuseDecision, ReusePolicy, SemanticCheckDefinition, SemanticRegistration, evaluate_reuse
 from .scanbench import BenchResult, run_bench
 from .schema import schema_object, schema_text
 from .settings import ProjectSettings, load_project_settings
@@ -67,6 +67,8 @@ __all__ = [
     "ScanConfig",
     "ScanResult",
     "SemanticStateBuilder",
+    "SemanticCheckDefinition",
+    "SemanticRegistration",
     "Snapshot",
     "RelationshipRecord",
     "UnknownRecord",

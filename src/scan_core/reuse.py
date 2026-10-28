@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import hashlib
 import json
 from typing import Any, Mapping
@@ -15,6 +15,48 @@ _TEXT_FIELDS = ("claim", "result", "method", "limitations", "verification_depth"
 
 
 @dataclass(frozen=True)
+class SemanticCheckDefinition:
+    """Current invocation's stable check definition, never loaded from a baseline."""
+
+    id: str
+    category: str
+    title: str
+    scope: str
+    method: str
+
+    def __post_init__(self) -> None:
+        if not all(isinstance(value, str) and value.strip() for value in asdict(self).values()):
+            raise ValueError("Semantic check definition fields must be nonempty strings")
+
+    @property
+    def digest(self) -> str:
+        return check_definition_digest(asdict(self))
+
+
+@dataclass(frozen=True)
+class SemanticRegistration:
+    """Explicit authority from the current semantic-analysis invocation."""
+
+    producer_kind: str
+    producer_name: str
+    producer_version: str
+    checks: tuple[SemanticCheckDefinition, ...]
+
+    def __post_init__(self) -> None:
+        if not all(isinstance(value, str) and value.strip() for value in self.producer):
+            raise ValueError("Semantic producer fields must be nonempty strings")
+        if not self.checks or not all(isinstance(check, SemanticCheckDefinition) for check in self.checks):
+            raise ValueError("Semantic registration requires current check definitions")
+        if len({check.id for check in self.checks}) != len(self.checks):
+            raise ValueError("Duplicate registered check ID")
+        object.__setattr__(self, 'checks', tuple(self.checks))
+
+    @property
+    def producer(self) -> tuple[str, str, str]:
+        return self.producer_kind, self.producer_name, self.producer_version
+
+
+@dataclass(frozen=True)
 class ReusePolicy:
     """Current-run compatibility requirements for prior higher-level evidence."""
 
@@ -23,6 +65,7 @@ class ReusePolicy:
     check_definitions: tuple[tuple[str, str], ...] = ()
     redaction_level: str = "standard"
     sensitive_path_patterns: tuple[str, ...] = ()
+    producer_checks: tuple[tuple[tuple[str, str, str], str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -85,6 +128,8 @@ def evaluate_reuse(
         return ReuseDecision(False, "missing_check_definition_digest")
     if definition_digest != check_map[check_id]:
         return ReuseDecision(False, "check_definition_mismatch")
+    if policy.producer_checks and (producer_key, check_id, definition_digest) not in policy.producer_checks:
+        return ReuseDecision(False, "producer_check_unregistered")
 
     evidence_class = previous_evidence.get("evidence_class")
     if not isinstance(evidence_class, str) or not evidence_class:

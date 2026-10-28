@@ -359,19 +359,17 @@ class SemanticStateBuilder:
             _required(completion_state, f"{ident}.completion_state"),
         ))
 
-    def assess_check(
+    def _check_record(
         self, *, category: str, status: str, scope: str, method: str,
         artifact_ids: StringInput, evidence_ids: StringInput, related_ids: StringInput = None,
         verification_state: str, result: str, limitations: str, reason: str,
-        next_step: str | None = None, title: str | None = None,
-    ) -> str:
-        if category not in CHECK_CATEGORIES:
-            raise BuilderError(f"check.category: {category!r} is not a required Scan check category")
+        next_step: str | None = None, title: str | None = None, record_id: str,
+    ) -> CheckRecord:
+        _required(category, "check.category")
         artifacts = _strings(artifact_ids, f"check:{category}.artifact_ids")
         evidence = _strings(evidence_ids, f"check:{category}.evidence_ids")
         related = _strings(related_ids, f"check:{category}.related_ids")
-        current = next((row for row in self.state["checks"] if row["category"] == category), None)
-        ident = current["id"] if current else f"check:{category}"
+        ident = _required(record_id, "check.id")
         self._refs(ident, "artifact_ids", artifacts, self._ids("artifacts"), "artifact IDs")
         self._refs(ident, "evidence_ids", evidence, self._ids("evidence"), "evidence IDs")
         allowed_related = self._ids("findings") | self._ids("controls") | self._ids("unknowns") | self._ids("actions")
@@ -382,12 +380,42 @@ class SemanticStateBuilder:
             _required(verification_state, f"{ident}.verification_state"), _required(result, f"{ident}.result"),
             _required(limitations, f"{ident}.limitations"), _required(reason, f"{ident}.reason"), next_step,
         )
-        row = _json_record(record)
-        if current:
-            self.state["checks"][self.state["checks"].index(current)] = row
-        else:
-            self.state["checks"].append(row)
-        return ident
+        return record
+
+    def add_check(self, *, record_id: str, **definition: Any) -> str:
+        """Add one concrete check; category is coverage, never identity."""
+        return self._append("checks", self._check_record(record_id=record_id, **definition))
+
+    def update_check(self, record_id: str, **changes: Any) -> str:
+        """Update only an existing check ID, retaining unspecified fields."""
+        current = next((row for row in self.state["checks"] if row["id"] == record_id), None)
+        if current is None:
+            raise BuilderError(f"{record_id}: unknown check ID")
+        definition = {key: value for key, value in current.items() if key != "id"}
+        definition.update(changes)
+        row = _json_record(self._check_record(record_id=record_id, **definition))
+        self.state["checks"][self.state["checks"].index(current)] = row
+        return record_id
+
+    def assess_check(self, *, category: str, record_id: str | None = None, **definition: Any) -> str:
+        """Compatibility upsert. Prefer add_check/update_check for explicit identity.
+
+        Category-only calls update the single existing category check. Once a
+        category has multiple checks, the caller must supply an ID.
+        """
+        if record_id is None:
+            matches = [row for row in self.state["checks"] if row["category"] == category]
+            if len(matches) > 1:
+                raise BuilderError(f"check.category: {category!r} is ambiguous; supply record_id")
+            record_id = matches[0]["id"] if matches else f"check:{category}"
+        if record_id in self._ids("checks"):
+            return self.update_check(record_id, category=category, **definition)
+        return self.add_check(record_id=record_id, category=category, **definition)
+
+    def category_coverage(self) -> dict[str, tuple[str, ...]]:
+        """Required coverage, independently of additional target-specific checks."""
+        return {category: tuple(row["id"] for row in self.state["checks"] if row["category"] == category)
+                for category in CHECK_CATEGORIES}
 
     def mark_artifact_analyzed(
         self, artifact_id: str, *, evidence_ids: StringInput, reason: str = "Semantic analysis completed"
