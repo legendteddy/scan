@@ -59,6 +59,28 @@ Create new state with `scan_project(ScanConfig(...))`, extend it with `SemanticS
 
 Current HTML requires exactly one `data-scan-count` marker for each renderer count, with integer text matching canonical records: `discovered_artifact_count`, `content_read_count`, `checks_assessed`, `finding_count`, `redaction_count`, `unknown_count`, `delta_artifacts_added`, `delta_artifacts_changed`, `delta_artifacts_removed`, `delta_findings_new`, `delta_findings_resolved`, `delta_unknowns_new`, `delta_unknowns_resolved`, `fresh_evidence_count`, `reused_evidence_count`, `rejected_reuse_count`. Do not nest or duplicate markers. Historical 1.3 uses its original six-marker contract; 1.2 validation retains its historical rules. Counts are reconciliation aids, never proof of claim accuracy. Keep fresh/reused, metadata-only, partial, unassessed and runtime coverage distinct. Without a defensible denominator, show qualitative status rather than a numerical percentage.
 
+### Reading and disclosure contract
+
+Current reports follow verdict, findings, changes, coverage/unknowns, architecture,
+actions and audit appendix. Evidence may be progressively disclosed with native
+`details`/`summary`; titles, impacts and recommendations remain visible. All
+canonical relationships, components, findings, unknowns, source locators and
+evidence IDs remain available. Audit tables are contained, keyboard-focusable
+regions; primary content uses wrapping lists/cards rather than wide tables.
+Exactly one authoritative JSON block is retained. Full technical records also
+remain available inside the audit appendix. Do not treat a zero finding count as
+verification when unknowns or incomplete inspection remain.
+
+When no baseline is available, show "No comparison baseline available." Keep the
+seven required zero delta count markers in a labeled native disclosure so count
+reconciliation remains compatible without dominating the first-scan narrative.
+Freshness counts remain separate and visible. Print expands essential disclosures,
+preserves evidence tables and references, and omits only duplicate technical views.
+Native fragment/Find disclosure behavior is browser-dependent; all sections remain
+manually keyboard-accessible. See `report-design.md` for visual acceptance, print
+limits and screenshot fixtures. These presentation checks do not relax HTML safety
+or claim aesthetic quality can be measured by a score.
+
 ### Static self-contained HTML safety
 
 `scan validate` parses HTML without executing it or making network requests. For all accepted schema versions it permits exactly the authoritative inert `application/json` script, inline CSS, native static HTML/disclosure, fragment anchors and ordinary HTTP(S)/mailto evidence links. Embedded raster image data is allowed; linked resources (including relative files), extra scripts (even JSON), event attributes, active URI schemes, CSS resource references/imports, CSS expression/binding/behavior mechanisms, foreign SVG/MathML surfaces, forms, base/refresh, plugins and frames are rejected. CSS resource syntax is conservatively rejected even if a particular URL might be local. No script or fetched stylesheet is needed to read a report. This deliberately narrow contract is not a general HTML sanitizer.

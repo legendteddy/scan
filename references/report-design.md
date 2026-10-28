@@ -1,43 +1,106 @@
-# Default Scan dashboard design
+# Scan report reading experience
 
-Use `assets/report-shell.html` as the starting file for new reports unless the user explicitly requests a different style. Read its source before filling it. The shell preserves the user-approved dashboard visual foundation; it contains no project data or inherited conclusions.
+Use `assets/report-shell.html` for new authored reports and the packaged
+`src/scan_core/report/shell.html` for Core rendering. Keep their bytes synchronized;
+packaging uses the latter directly. Current authoring version: **1.4**.
+Historically accepted validation versions: **1.2 and 1.3**, plus current 1.4.
+The current supported state contract is currently 1.4 for new reports. Historical
+1.2 examples and their frozen generator/shell remain unchanged.
 
-## Preserve the visual identity
+## Reading order and visual system
 
-- Keep the large dark navy gradient hero, soft blue/violet ambient accents, light gray page, white rounded cards, spacious section rhythm and prominent typography.
-- Keep fact cards, compact status pills, a connected anatomy view, strength cards, component cards, a dark coverage panel and numbered action cards where relevant.
-- Preserve the 1240px desktop canvas, 28–38px primary radii, roughly 58px hero padding, 48–86px hero headline and broad gaps between sections. Let mobile rules reduce density naturally.
-- Use gradients and shadows quietly. Avoid neon/cyber decoration, a generic white-header memo, dense audit-document styling, or collapsing the whole report into tables.
-- Use tables for exact inventory/evidence and comparison details. Keep the primary narrative visual, plain-language and readable without expanding drawers.
+A reader should first learn what was inspected, what matters, what changed, what
+is unknown, what to do, and where the proof lives. Use this order:
 
-## Adapt content within the design
+1. Executive verdict (`#verdict`): one H1 naming the target, one concise canonical
+   condition, at most four essential facts, explicit unknown/readiness notice.
+2. Top findings (`#findings`): severity, evidence type, title, impact and next step
+   stay visible; confidence, limits and evidence use native disclosure.
+3. What changed (`#changes`): Scan baseline delta, evidence freshness, and Git
+   advisory scope are distinct blocks. Resolved means absent now, never fixed.
+4. Coverage and unknowns (`#coverage`, `#unknowns`): discovery, content reading,
+   fresh/reused analysis, limited depth, unfinished checks and runtime evidence
+   remain distinct. Unknowns carry impact and a safe next step.
+5. Architecture (`#architecture`): every canonical relationship has named source,
+   type, target, explanation, confidence, verification state and evidence. Artifact
+   endpoints are valid even without components. Lists avoid invented/spaghetti
+   edges; beyond eight relationships, a labeled disclosure retains every row.
+6. Recommended actions (`#actions`): at most five distinct priorities, from
+   canonical actions or finding/unknown next steps. Preserve the complete set in
+   audit receipts. Do not infer new remediation from file names or empty findings.
+7. Audit appendix (`#audit`): native closed details hold checks, all findings,
+   unknowns, relationships, inventory, ledger, controls, actions/continuation,
+   baseline/reuse, full metadata and complete technical records.
 
-Reorder, add or remove sections and change headings to fit repositories, websites, documents, packages and mixed collections. Do not force six metrics, three actions, nine map nodes or a financial section. Use only meaningful, supported counts. Never copy the old report's findings, financial amounts, project names, private content or health claims.
+Keep Scan's navy identity and blue evidence links. Use flat surfaces, restrained
+system typography, four-pixel radii, clear spacing and readable prose. The shell
+has one token system for page/reading widths, spacing, type, colors, borders,
+focus, surfaces and code. Do not append override/patch layers, restore the former
+gradient/glass dashboard, add progress decoration, or invent a universal score.
 
-Treat the anatomy view as a real relationship diagram: arrows must represent evidenced connections, with clear direction and meaning. Do not join unrelated components just to fill a row. At most three node cards per row in this shell; use an accessible labeled SVG or another layout when branching needs it. Label inferred connections and provide evidence locators in ordinary visible captions.
+## Disclosure, anchors and accessibility
 
-Put incomplete analysis and critical unknowns near the verdict. Use labels such as “implemented; effectiveness unverified” when only static support exists. A green pill or glowing status dot must not imply a live connection, current PASS or verified effectiveness without evidence. The shell intentionally omits the original live indicator.
+No script is required to read the report, navigate or reveal receipts. Keep native
+`details` / `summary`; avoid an accordion that closes other evidence. Evidence
+anchors retain `e-<canonical ID>`. All findings have `f-<ID>` anchors in the full
+finding disclosure; unknowns and relationships have `u-<ID>` / `r-<ID>` anchors.
+Source locators and complete evidence IDs stay linked. Preserve prior section
+anchors such as `verdict-title`, `changed-title`, `checks-title`, `evidence-title`,
+`anatomy-title`, `parts-title`, `unknowns-title`, `mode-title` and `privacy-title`.
 
-Use semantic headings and text alternatives for diagrams. Keep contrast readable, metadata wrap-safe, keyboard focus visible, mobile content complete and print layouts usable. Do not hide evidence columns on mobile. Keep core facts available without JavaScript.
+Chromium reveals the ancestor disclosures on fragment navigation and browser
+Find. Native browser behavior varies; readers can always open disclosures using
+the keyboard. Keep one H1, semantic heading order, one main landmark, visible
+focus, a skip link, semantic navigation anchors, text severity labels, and 44px
+navigation/summary targets. No ARIA replacement for native disclosure behavior.
 
-## Populate and check
+At 390px, primary content is stacked and never requires horizontal scrolling.
+At 768/1024/1280/1536px, let summary columns grow within the page width. Only
+explicitly labeled audit table regions may scroll horizontally; retain all columns
+and make the region keyboard focusable. Long paths/IDs wrap without breaking
+ordinary prose into character fragments. Table headings use `scope="col"`.
 
-Escape ordinary text slots. Generate *_HTML slots only from agent-authored markup containing escaped data. Serialize STATE_JSON using the report contract's escaping rules. Fill or remove every `{{...}}` placeholder; do not ship the unfinished shell. Use the current supported Scan state contract (currently 1.4 for new reports), populate the dynamic `STATE_SCHEMA_VERSION` slot from the embedded state, and validate the report. The historical 1.2 demo remains historical. The shell is presentation scaffolding, not evidence and not a valid report until populated.
+## Print
 
-Inspect desktop, narrow-screen and print output when rendering tools are available. Check hero wrapping, card height, anatomy labels/arrows, evidence tables and consistency of visible/embedded counts. If rendering is unavailable, record that limit rather than claiming visual verification. Never weaken evidence requirements to preserve a visual arrangement.
+Print hides sticky navigation and the skip link, removes the dark header fill,
+keeps severity text and references, and repeats table headers. Print CSS expands
+closed details, including the ledger, all findings and inventory. Full technical
+JSON, duplicate unknown receipts and duplicate relationship receipts are omitted
+from print because the same information is already rendered in readable records;
+they remain in HTML and in the authoritative embedded state. Baseline, source,
+action and continuation receipts remain printable. No evidence rows are removed.
+Full audit PDFs can be long. Chromium is captured; other print engines may need
+manual disclosure expansion and remain an explicit review limit.
 
-## Component markup contract
+## Acceptance
 
-Read `assets/report-components.html` before filling HTML slots. Copy the supplied metric/control/table patterns rather than guessing their child structure. Keep CSS and markup changes together.
+Run the full Core and historical suites, Phase A gates, package/install gates and
+`git diff --check`. `tests/test_report_ux.py` adds stdlib assertions for reading
+order, links/IDs, complete findings/relationships, native disclosure, counts,
+state preservation, deterministic rendering and primary/audit separation.
+The safety validator is unchanged and is not an aesthetics score.
 
-Keep metric labels, values and notes on separate block rows. Use `metric-code` for a long identifier; ordinary words must wrap only at natural boundaries. Use fewer columns at intermediate widths rather than breaking “BLOCKED” or “Reachable” into fragments.
+For visual acceptance (optional development dependencies only):
 
-Keep control status, title, explanation and evidence in a single flowing column. Never put prose or multiword statuses in the old narrow numbered-icon grid. Evidence tables need distinct keyboard-focusable horizontal scroll regions, reasonable minimum column widths and normal word wrapping; only long machine identifiers/URLs may break within a token. Do not apply `overflow-wrap:anywhere` to ordinary prose or enum labels such as “observed”.
+```console
+python -m pip install playwright
+python -m playwright install chromium
+python scripts/build_report_review.py --output <review>/reports --self-scan
+python scripts/capture_preview.py <review>/reports/scan-on-scan.html --output <review>/captures
+```
 
-Inspect the populated report, not just the empty shell. Specifically check label/value separation, status/title overlap, long descriptions, normal words in enum columns, desktop and intermediate-width card grids, and narrow-screen table scrolling. Schema validation does not detect layout failures. If browser rendering is unavailable, perform structural component checks and disclose the visual limit.
+Pass additional report paths to capture every fixture at all five widths. Use
+`--before <old-rendered-report.html>` for a fair comparison using the same canonical
+state. The builder generates small, many-findings, long-locator/ID, large-inventory,
+large-ledger, repeat-baseline, verified-reuse, unknown-heavy and zero-findings with
+unknowns cases. Synthetic cases are labeled; the optional self scan inventories
+Scan without executing it and adds only the explicitly documented limited source
+review. It does not claim complete semantic analysis.
 
-## Check-coverage presentation
-
-Include a visible “What was checked” section, using the existing appendix and keyboard-focusable table-scroll patterns. Use plain-language labels for the five check statuses. Keep scope, method, result/limitations and evidence readable; detailed machine category/ID strings can stay in the appendix. Check-completion counts must not imply project health or current test success. Preserve the established visual identity.
-
-Current authoring version: **1.4**. Historically accepted validation versions: **1.2 and 1.3** (plus current 1.4). Preserve historical artifacts and their original version labels. See `report-contract.md` for baseline, delta, freshness and visible count requirements. Coverage counts must come from canonical records; use qualitative status when no measured denominator exists.
+`capture_preview.py` asserts primary width and descendant overflow, contained
+expanded audit tables, state equality, anchors, scopes, no remote requests,
+keyboard focus/disclosure and evidence deep links with JavaScript disabled. It
+captures closed-details print PDFs for self review, many findings and long IDs.
+CI uploads these reports, captures and exact browser receipt as review artifacts.
+Inspect screenshots and PDF pages manually. Passing automation is not owner
+acceptance, and no UI quality score is produced.

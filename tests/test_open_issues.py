@@ -250,17 +250,15 @@ class ReportAndShellTests(unittest.TestCase):
                 safe_verification="Inspect source",
             )
         html = render_html(builder.build())
-        self.assertLess(html.index("Decisions that matter"), html.index("Project facts"))
-        self.assertLess(html.index("02 · What changed"), html.index("03 · Strengths"))
-        self.assertLess(html.index("03 · Strengths"), html.index("04 · Open questions"))
-        self.assertLess(html.index("04 · Open questions"), html.index("05 · Coverage"))
-        self.assertLess(html.index("05 · Coverage"), html.index("06 · Anatomy"))
-        self.assertLess(html.index("06 · Anatomy"), html.index("07 · The parts"))
+        anchors = ('verdict', 'findings', 'changes', 'coverage', 'architecture', 'actions', 'audit')
+        positions = [html.index(f'id="{anchor}"') for anchor in anchors]
+        self.assertEqual(positions, sorted(positions))
+        self.assertGreater(html.index('id="strengths-title"'), html.index('id="audit"'))
         self.assertEqual(html.count('data-priority-finding="true"'), 5)
         self.assertIn("All findings", html)
         for index in range(6):
             self.assertIn(f"Finding {index}", html)
-        self.assertIn("<strong>Mode</strong> deep", html)
+        self.assertIn("deep inspection", html)
 
 
 if __name__ == "__main__":

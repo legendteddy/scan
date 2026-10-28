@@ -1,65 +1,124 @@
-#!/usr/bin/env python3
-"""Optional visual QA and preview PNG refresh; requires Playwright + Chromium.
+"""Optional current-report visual acceptance; requires Playwright + Chromium.
 
-Install separately: python -m pip install playwright && python -m playwright install chromium
-Not needed to use Scan, validate a report, or run CI.
+Every report context disables JavaScript. Browser evaluate calls inspect layout;
+they are not shipped in reports. No dependency is added to the Scan package.
 """
+from __future__ import annotations
+import argparse
+import json
 from pathlib import Path
-import tempfile
-
 from playwright.sync_api import sync_playwright
+from scan_core.validate import validate_report
 
-ROOT = Path(__file__).resolve().parents[1]
-REPORT = ROOT / "examples" / "demo-report.html"
-SOCIAL = ROOT / "assets" / "social-preview.svg"
+WIDTHS = (390, 768, 1024, 1280, 1536)
+ANCHORS = ('verdict', 'findings', 'changes', 'coverage', 'architecture', 'actions', 'audit')
 
 
-def main():
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        context = browser.new_context(viewport={"width": 1280, "height": 780},
-                                      device_scale_factor=1, java_script_enabled=False)
-        page = context.new_page()
-        external = []
-        page.on("request", lambda req: external.append(req.url) if req.url.startswith(("http:", "https:")) else None)
-        page.goto(REPORT.as_uri(), wait_until="load")
-        assert page.locator("#project-anatomy-state").count() == 1
-        assert page.locator("h1").count() == 1
-        assert page.locator("table.table-checks tbody tr").count() == 14
-        assert not external, f"Unexpected remote requests: {external}"
-        page.screenshot(path=str(ROOT / "assets" / "demo-preview.png"),
-                        clip={"x": 0, "y": 0, "width": 1280, "height": 780})
-        context.close()
+def structural(page, state):
+    assert page.locator('h1').count() == 1
+    assert page.locator('main').count() == 1
+    assert page.locator('#project-anatomy-state').count() == 1
+    assert json.loads(page.locator('#project-anatomy-state').text_content()) == state
+    for anchor in ANCHORS:
+        assert page.locator(f'#{anchor}').count() == 1, anchor
+        assert page.locator(f'nav a[href="#{anchor}"]').count() == 1, anchor
+    assert page.locator('#audit > details').count() >= 8
+    assert page.locator('#audit table').count() >= 3
+    assert page.locator('table th:not([scope="col"])').count() == 0
+    result = page.evaluate('''() => {
+        const ids = [...document.querySelectorAll('[id]')].map(e => e.id);
+        const missing = [...document.querySelectorAll('a[href^="#"]')]
+            .map(a => a.getAttribute('href').slice(1)).filter(id => !document.getElementById(id));
+        const overflow = [...document.querySelectorAll('main *')].filter(e => {
+            const r = e.getBoundingClientRect();
+            return r.width && r.height && !e.closest('#audit') && e.scrollWidth > e.clientWidth + 2
+                && !['SPAN', 'A', 'B', 'STRONG', 'CODE', 'SMALL'].includes(e.tagName);
+        }).map(e => ({tag:e.tagName, id:e.id, cls:e.className, width:e.clientWidth, scroll:e.scrollWidth}));
+        return {unique:new Set(ids).size === ids.length, missing, overflow,
+            page:document.documentElement.scrollWidth, viewport:document.documentElement.clientWidth,
+            hero:document.querySelector('.hero').getBoundingClientRect().height,
+            nav:document.querySelector('nav').getBoundingClientRect().height};
+    }''')
+    assert result['unique'], 'Duplicate IDs'
+    assert not result['missing'], result['missing']
+    assert result['page'] <= result['viewport'] + 2, result
+    assert not result['overflow'], result['overflow']
+    assert result['nav'] <= 120, result
+    return result
 
-        mobile = browser.new_context(viewport={"width": 390, "height": 844},
-                                     device_scale_factor=1, java_script_enabled=False)
-        small = mobile.new_page()
-        small.goto(REPORT.as_uri(), wait_until="load")
-        # Long evidence tables scroll within their own region, not the whole page.
-        widths = small.evaluate("""() => ({
-            viewport: document.documentElement.clientWidth,
-            page: document.documentElement.scrollWidth,
-            tables: document.querySelectorAll('.table-scroll').length
-        })""")
-        assert widths["page"] <= widths["viewport"] + 2, f"Horizontal page overflow: {widths}"
-        assert widths["tables"] >= 3, "Missing scrollable appendix tables"
-        with tempfile.TemporaryDirectory() as tmp:
-            small.screenshot(path=str(Path(tmp) / "mobile.png"), full_page=True)
-            small.emulate_media(media="print")
-            small.screenshot(path=str(Path(tmp) / "print.png"), full_page=False)
-        mobile.close()
 
-        social_context = browser.new_context(viewport={"width": 1280, "height": 640},
-                                             device_scale_factor=1)
-        social = social_context.new_page()
-        social.goto(SOCIAL.as_uri(), wait_until="load")
-        social.screenshot(path=str(ROOT / "assets" / "social-preview.png"),
-                          clip={"x": 0, "y": 0, "width": 1280, "height": 640})
-        social_context.close()
+def capture(reports, output, before=None, pdf=True):
+    output.mkdir(parents=True, exist_ok=True)
+    receipt = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        for report in reports:
+            state = validate_report(report)
+            for width in WIDTHS:
+                ctx = browser.new_context(viewport={'width': width, 'height': 900 if width > 390 else 844}, java_script_enabled=False)
+                page = ctx.new_page()
+                remote = []
+                page.on('request', lambda req: remote.append(req.url) if req.url.startswith(('http:', 'https:')) else None)
+                page.goto(report.as_uri(), wait_until='load')
+                measured = structural(page, state)
+                assert not remote, remote
+                name = f'{report.stem}-after-{width}'
+                page.screenshot(path=str(output / (name + '.png')), full_page=True)
+                page.screenshot(path=str(output / (name + '-first-screen.png')))
+                page.locator('#artifact-inventory > summary').click()
+                page.locator('#evidence-ledger > summary').click()
+                assert page.evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth + 2')
+                for region in page.locator('#audit .table-scroll').all():
+                    assert region.get_attribute('tabindex') == '0'
+                if width == 390 and report.stem == 'scan-on-scan':
+                    page.locator('#evidence-ledger').scroll_into_view_if_needed()
+                    page.screenshot(path=str(output / 'scan-on-scan-audit-390.png'))
+                receipt.append({'report': report.name, 'width': width, **measured, 'network_requests': len(remote)})
+                ctx.close()
+            ctx = browser.new_context(viewport={'width': 1280, 'height': 900}, java_script_enabled=False)
+            page = ctx.new_page()
+            page.goto(report.as_uri())
+            page.keyboard.press('Tab')
+            assert page.locator('.skip-link').evaluate('(e)=>e===document.activeElement')
+            page.locator('#evidence-ledger > summary').focus()
+            assert page.locator('#evidence-ledger > summary').evaluate('(e)=>getComputedStyle(e).outlineStyle') != 'none'
+            page.keyboard.press('Enter')
+            assert page.locator('#evidence-ledger').get_attribute('open') is not None
+            page.goto(report.as_uri())
+            if state['evidence']:
+                evidence_id = state['evidence'][0]['id']
+                page.goto(report.as_uri() + '#e-' + evidence_id)
+                page.wait_for_function('document.querySelector("#evidence-ledger").open')
+                assert page.locator('[id=' + json.dumps('e-' + evidence_id) + ']').is_visible()
+            if pdf and report.stem in ('scan-on-scan', 'many-findings', 'long-identifiers'):
+                page.goto(report.as_uri())
+                page.emulate_media(media='print')
+                # Print CLOSED details via CSS; do not silently open them using DOM automation.
+                assert page.locator('#evidence-ledger').get_attribute('open') is None
+                assert page.locator('.metric-grid').first.evaluate('(e)=>getComputedStyle(e).display') == 'grid'
+                assert page.locator('.table-checks td').first.evaluate('(e)=>getComputedStyle(e).display') == 'block'
+                page.pdf(path=str(output / (report.stem + '-after.pdf')), format='A4', print_background=True)
+                assert page.locator('#evidence-ledger table').evaluate('(e)=>e.getBoundingClientRect().height') > 0
+                page.screenshot(path=str(output / (report.stem + '-print.png')))
+            ctx.close()
+        if before:
+            for width in WIDTHS:
+                ctx = browser.new_context(viewport={'width': width, 'height': 900 if width > 390 else 844}, java_script_enabled=False)
+                page = ctx.new_page()
+                page.goto(before.as_uri())
+                page.screenshot(path=str(output / f'scan-on-scan-before-{width}.png'), full_page=True)
+                page.screenshot(path=str(output / f'scan-on-scan-before-{width}-first-screen.png'))
+                ctx.close()
         browser.close()
-        print("PASS: desktop, mobile and print render checks; no external requests")
-        print("Wrote assets/demo-preview.png and assets/social-preview.png")
+    (output / 'browser-receipt.json').write_text(json.dumps(receipt, indent=2), encoding='utf-8')
+    print(f'PASS: {len(receipt)} report/viewport combinations; native keyboard, deep links and print checked. Captures: {output}')
 
 
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('reports', type=Path, nargs='+')
+    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--before', type=Path)
+    parser.add_argument('--no-pdf', action='store_true')
+    args = parser.parse_args()
+    capture([path.resolve() for path in args.reports], args.output.resolve(), args.before.resolve() if args.before else None, not args.no_pdf)
