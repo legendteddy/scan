@@ -14,7 +14,7 @@ from scan_core import (
     SemanticStateBuilder, canonical_state_json, render_html, scan_project,
     state_digest, validate_report, validate_state,
 )
-from scan_core.auxiliary import AuxiliaryReadError, read_auxiliary
+from scan_core.auxiliary import AuxiliaryReadError, _windows_path_key, read_auxiliary
 from scan_core.cli import main
 from scan_core.errors import CommandError, UnsafeReportError, ValidationError
 from scan_core.git_provenance import inspect_git_provenance
@@ -39,6 +39,79 @@ def git_metadata(root: Path) -> Path:
 
 
 class MetadataBoundaryTests(unittest.TestCase):
+    def test_windows_path_namespaces_and_separators_share_comparison_key(self):
+        for left, right in (
+            (r'\\?\C:\Root\File', 'c:/root/file'),
+            (r'\\?\UNC\Server\Share\Root\File', r'\\server\share\root\file'),
+        ):
+            with self.subTest(left=left):
+                self.assertEqual(_windows_path_key(left), _windows_path_key(right))
+
+    @unittest.skipUnless(os.name == 'nt', 'native Windows canonical handle paths')
+    def test_windows_handle_path_representation_and_short_name_alias(self):
+        import ctypes
+        with tempfile.TemporaryDirectory(prefix='Scan canonical path with spaces ') as directory:
+            root = Path(directory)
+            (root / 'metadata').write_bytes(b'authorized')
+            short_path = ctypes.windll.kernel32.GetShortPathNameW
+            short_path.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+            short_path.restype = ctypes.c_uint32
+            buffer = ctypes.create_unicode_buffer(32768)
+            length = short_path(str(root), buffer, len(buffer))
+            self.assertTrue(0 < length < len(buffer))
+            # Some volumes disable 8.3 names; their returned long path remains
+            # legitimate. Hosted runners with short TEMP names exercise both.
+            alias = Path(buffer.value)
+            self.assertEqual(read_auxiliary(alias, 'metadata', max_bytes=32), b'authorized')
+            get_path = ctypes.windll.kernel32.GetFinalPathNameByHandleW
+            def alternate_path(handle, output, size, flags):
+                length = get_path(handle, output, size, flags)
+                output.value = output.value.upper().replace('\\', '/')
+                return length
+            with patch.object(ctypes.windll.kernel32, 'GetFinalPathNameByHandleW', side_effect=alternate_path):
+                self.assertEqual(read_auxiliary(root, 'metadata', max_bytes=32), b'authorized')
+
+    def test_external_grants_canonicalize_ancestor_alias_but_confine_children(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            real = base / 'real'
+            real.mkdir()
+            alias = base / 'alias'
+            if os.name == 'nt':
+                _create_windows_junction(alias, real)
+            else:
+                alias.symlink_to(real, target_is_directory=True)
+            root = base / 'project'
+            root.mkdir()
+            common = git_metadata(real / 'repo')
+            metadata = common / 'worktrees/review'
+            metadata.mkdir(parents=True)
+            (metadata / 'HEAD').write_text('ref: refs/heads/main', encoding='utf-8')
+            (metadata / 'commondir').write_text('../..', encoding='utf-8')
+            (root / '.git').write_text('gitdir: ' + str(alias / 'repo/.git/worktrees/review'), encoding='utf-8')
+            grants = (metadata, alias / 'repo/.git')
+            self.assertEqual(inspect_git_provenance(root, metadata_roots=grants).commit, COMMIT)
+            self.assertIsNone(inspect_git_provenance(root, metadata_roots=(real, alias)).commit)
+            # The exact grants do not authorize a sibling worktree.
+            sibling = common / 'worktrees/sibling'
+            sibling.mkdir()
+            (sibling / 'HEAD').write_text(COMMIT, encoding='utf-8')
+            (root / '.git').write_text('gitdir: ' + str(sibling), encoding='utf-8')
+            self.assertIsNone(inspect_git_provenance(root, metadata_roots=grants).commit)
+            (root / '.git').write_text('gitdir: ' + str(metadata), encoding='utf-8')
+            # Links INSIDE a canonical grant remain unsafe, even if their
+            # targets exist under a separately granted common directory.
+            (metadata / 'HEAD').unlink()
+            if os.name == 'nt':
+                (metadata / 'HEAD').write_text('ref: refs/heads/main', encoding='utf-8')
+                (sibling / 'main').write_text(COMMIT, encoding='utf-8')
+                (common / 'refs/heads/main').unlink()
+                (common / 'refs/heads').rmdir()
+                _create_windows_junction(common / 'refs/heads', sibling)
+            else:
+                (metadata / 'HEAD').symlink_to(common / 'HEAD')
+            self.assertIsNone(inspect_git_provenance(root, metadata_roots=grants).commit)
+
     def test_parent_and_absolute_head_traversal_never_open_outside(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / 'project'
@@ -199,6 +272,11 @@ class MetadataBoundaryTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name == 'nt', 'Windows opened-handle junction race regression')
     def test_replaced_parent_junction_is_rejected_before_reading(self):
+        for same_identity in (False, True):
+            with self.subTest(same_identity=same_identity):
+                self._assert_replaced_parent_rejected(same_identity)
+
+    def _assert_replaced_parent_rejected(self, same_identity):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             parent = root / 'metadata'
@@ -206,7 +284,12 @@ class MetadataBoundaryTests(unittest.TestCase):
             outside = root / 'outside'
             outside.mkdir()
             (parent / 'HEAD').write_text(COMMIT, encoding='utf-8')
-            (outside / 'HEAD').write_text('sensitive outside content', encoding='utf-8')
+            if same_identity:
+                # A hard link defeats an identity-only check, while its opened
+                # final path still differs from the exact intended target.
+                os.link(parent / 'HEAD', outside / 'HEAD')
+            else:
+                (outside / 'HEAD').write_text('sensitive outside content', encoding='utf-8')
             real_open = os.open
             def replace_parent(path, *args, **kwargs):
                 parent.rename(root / 'original-metadata')

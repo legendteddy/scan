@@ -73,12 +73,15 @@ def _authorized_directory(root: Path, candidate: Path, allowed: tuple[Path, ...]
     except (ValueError, AuxiliaryReadError):
         pass
     for grant in allowed:
-        if candidate.absolute() == grant.absolute():
-            try:
-                # Check ancestors too: grants cannot authorize a reparse escape.
-                return auxiliary_path(Path(candidate.anchor), candidate.absolute().relative_to(candidate.anchor))
-            except AuxiliaryReadError:
-                return None
+        try:
+            # The invocation authorizes this exact directory, including normal
+            # OS aliases in ancestors (e.g. macOS /var -> /private/var). Pin its
+            # canonical target; auxiliary reads still reject links below it.
+            boundary = grant.resolve(strict=True)
+            if boundary.is_dir() and candidate.resolve(strict=True) == boundary:
+                return boundary
+        except (OSError, ValueError, RuntimeError):
+            continue
     return None
 
 

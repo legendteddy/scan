@@ -6,6 +6,7 @@ indirection is resolved separately and never grants access to arbitrary parents.
 from __future__ import annotations
 
 import os
+import ntpath
 from pathlib import Path, PureWindowsPath
 import stat
 from contextlib import contextmanager
@@ -14,6 +15,16 @@ from typing import Iterator
 
 class AuxiliaryReadError(ValueError):
     """Metadata was missing, oversized, or outside the authorized boundary."""
+
+
+def _windows_path_key(value: str | Path) -> str:
+    """Compare canonical Win32 paths using the same namespace and separators."""
+    value = str(value).replace("/", "\\")
+    if value[:8].lower() == "\\\\?\\unc\\":
+        value = "\\\\" + value[8:]
+    elif value.startswith("\\\\?\\"):
+        value = value[4:]
+    return ntpath.normcase(ntpath.normpath(value))
 
 
 def is_link_or_reparse(metadata: os.stat_result) -> bool:
@@ -55,6 +66,12 @@ def _open_metadata(root: Path, path: Path, flags: int) -> Iterator[int]:
         # path.resolve() alone leaves a parent-junction replacement race.
         import ctypes
         import msvcrt
+        # Pin the intended canonical boundary/target BEFORE os.open can follow
+        # a replaced parent. resolve() also expands native short-name aliases.
+        boundary = root.resolve(strict=True)
+        expected = path.resolve(strict=True)
+        if not expected.is_relative_to(boundary):
+            raise AuxiliaryReadError('metadata escaped its authorized root before opening')
         descriptor = os.open(path, flags)
         try:
             get_path = ctypes.windll.kernel32.GetFinalPathNameByHandleW
@@ -64,12 +81,9 @@ def _open_metadata(root: Path, path: Path, flags: int) -> Iterator[int]:
             length = get_path(msvcrt.get_osfhandle(descriptor), buffer, len(buffer), 0)
             if not length or length >= len(buffer):
                 raise AuxiliaryReadError('opened metadata path could not be verified')
-            actual = buffer.value
-            if actual.startswith('\\\\?\\UNC\\'):
-                actual = '\\\\' + actual[8:]
-            elif actual.startswith('\\\\?\\'):
-                actual = actual[4:]
-            if os.path.normcase(actual) != os.path.normcase(str(path)):
+            actual = Path(_windows_path_key(buffer.value)).resolve(strict=True)
+            if (_windows_path_key(actual) != _windows_path_key(expected)
+                    or not actual.is_relative_to(boundary)):
                 raise AuxiliaryReadError('opened metadata escaped its authorized path')
             yield descriptor
         finally:

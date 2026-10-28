@@ -133,6 +133,7 @@ jobs:
         run: python -m pip wheel --disable-pip-version-check --no-deps . --wheel-dir wheelhouse
 
       - name: Install built wheel
+        id: install-wheel
         run: python -c "from pathlib import Path; import subprocess,sys; w=next(Path('wheelhouse').glob('*.whl')); subprocess.check_call([sys.executable,'-m','pip','install','--disable-pip-version-check','--force-reinstall','--no-deps',str(w)])"
 
       - name: Verify installed console entrypoint
@@ -144,7 +145,9 @@ jobs:
         run: python -B -m unittest discover -s tests -p "test_*.py" -v
 
       - name: Run ScanBench v1 on native filesystem
+        if: ${{ !cancelled() && steps.install-wheel.outcome == 'success' }}
         run: scan bench
 
       - name: Run installed v0.3 acceptance matrix
+        if: ${{ !cancelled() && steps.install-wheel.outcome == 'success' }}
         run: python scripts/v03_acceptance.py
