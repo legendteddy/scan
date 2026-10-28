@@ -1,0 +1,115 @@
+name: Scan project
+description: Evidence-backed whole-project inspection with canonical state, HTML report, SARIF, and an honest GitHub job summary
+author: legendteddy
+
+branding:
+  icon: search
+  color: purple
+
+inputs:
+  path:
+    description: Project directory to inspect, relative to the GitHub workspace unless absolute
+    required: false
+    default: .
+  mode:
+    description: "Scan coverage mode: quick, deep, or forensic"
+    required: false
+    default: deep
+  redact:
+    description: "Redaction level: none, standard, or strict"
+    required: false
+    default: standard
+  baseline:
+    description: "Baseline policy passed to Scan: none, auto, or a state path"
+    required: false
+    default: none
+  changed-since:
+    description: Optional local Git ref used only as advisory changed-scope context
+    required: false
+    default: ""
+  excludes:
+    description: Optional newline-separated exclusion patterns
+    required: false
+    default: ""
+  sensitive-paths:
+    description: Optional newline-separated sensitive path patterns
+    required: false
+    default: ""
+  output-directory:
+    description: Optional output directory; defaults to a fresh directory under RUNNER_TEMP
+    required: false
+    default: ""
+  fail-on:
+    description: "Optional Scan threshold: PARTIAL or ERROR"
+    required: false
+    default: ""
+  job-summary:
+    description: Append the conservative Scan summary to GITHUB_STEP_SUMMARY
+    required: false
+    default: "true"
+  python-version:
+    description: Python version supplied by actions/setup-python
+    required: false
+    default: "3.12"
+
+outputs:
+  state:
+    description: Absolute path to canonical Scan state JSON
+    value: ${{ steps.scan.outputs.state }}
+  report:
+    description: Absolute path to the self-contained HTML report
+    value: ${{ steps.scan.outputs.report }}
+  sarif:
+    description: Absolute path to SARIF 2.1.0 output
+    value: ${{ steps.scan.outputs.sarif }}
+  summary:
+    description: Absolute path to the Markdown summary
+    value: ${{ steps.scan.outputs.summary }}
+  findings-count:
+    description: Number of canonical findings
+    value: ${{ steps.scan.outputs['findings-count'] }}
+  unknowns-count:
+    description: Number of canonical unknowns
+    value: ${{ steps.scan.outputs['unknowns-count'] }}
+  checks-assessed:
+    description: Number of checks with assessed status
+    value: ${{ steps.scan.outputs['checks-assessed'] }}
+  checks-total:
+    description: Total number of Scan checks
+    value: ${{ steps.scan.outputs['checks-total'] }}
+  artifacts-discovered:
+    description: Number of discovered artifacts
+    value: ${{ steps.scan.outputs['artifacts-discovered'] }}
+  analysis-complete:
+    description: Whether semantic analysis is complete according to canonical state
+    value: ${{ steps.scan.outputs['analysis-complete'] }}
+  scan-version:
+    description: Scan producer version
+    value: ${{ steps.scan.outputs['scan-version'] }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: ${{ inputs['python-version'] }}
+
+    - name: Run Scan
+      id: scan
+      shell: python
+      env:
+        SCAN_INPUT_PATH: ${{ inputs.path }}
+        SCAN_INPUT_MODE: ${{ inputs.mode }}
+        SCAN_INPUT_REDACT: ${{ inputs.redact }}
+        SCAN_INPUT_BASELINE: ${{ inputs.baseline }}
+        SCAN_INPUT_CHANGED_SINCE: ${{ inputs['changed-since'] }}
+        SCAN_INPUT_EXCLUDES: ${{ inputs.excludes }}
+        SCAN_INPUT_SENSITIVE_PATHS: ${{ inputs['sensitive-paths'] }}
+        SCAN_INPUT_OUTPUT_DIRECTORY: ${{ inputs['output-directory'] }}
+        SCAN_INPUT_FAIL_ON: ${{ inputs['fail-on'] }}
+        SCAN_INPUT_JOB_SUMMARY: ${{ inputs['job-summary'] }}
+      run: |
+        import os
+        import runpy
+        runpy.run_path(os.path.join(os.environ["GITHUB_ACTION_PATH"], "scripts", "github_action.py"), run_name="__main__")

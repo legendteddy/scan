@@ -198,6 +198,36 @@ jobs:
           scan doctor . --json
           python -c "import json,pathlib,subprocess,tempfile; d=pathlib.Path(tempfile.mkdtemp()); state=d/'state.json'; sarif=d/'scan.sarif'; subprocess.run(['scan','.', '--offline','--baseline','none','--no-html','--state',str(state),'--quiet'],check=True); subprocess.run(['scan','sarif',str(state),'--output',str(sarif)],check=True); p=json.loads(sarif.read_text(encoding='utf-8')); assert p['version']=='2.1.0' and len(p['runs'])==1 and isinstance(p['runs'][0]['results'],list); print('SARIF_CLI_SMOKE=PASS')"
 
+      - name: Verify reusable GitHub Action receipts
+        id: scan-action
+        uses: ./
+        with:
+          path: scanbench/fixtures/clean-minimal/project
+          baseline: none
+          job-summary: "false"
+
+      - name: Check reusable GitHub Action outputs
+        shell: python
+        env:
+          SCAN_STATE: ${{ steps.scan-action.outputs.state }}
+          SCAN_REPORT: ${{ steps.scan-action.outputs.report }}
+          SCAN_SARIF: ${{ steps.scan-action.outputs.sarif }}
+          SCAN_SUMMARY: ${{ steps.scan-action.outputs.summary }}
+          SCAN_FINDINGS: ${{ steps.scan-action.outputs['findings-count'] }}
+          SCAN_ANALYSIS_COMPLETE: ${{ steps.scan-action.outputs['analysis-complete'] }}
+        run: |
+          import json
+          import os
+          from pathlib import Path
+          paths = [Path(os.environ[name]) for name in ("SCAN_STATE", "SCAN_REPORT", "SCAN_SARIF", "SCAN_SUMMARY")]
+          assert all(path.is_file() for path in paths), paths
+          sarif = json.loads(Path(os.environ["SCAN_SARIF"]).read_text(encoding="utf-8"))
+          assert sarif["version"] == "2.1.0"
+          assert os.environ["SCAN_FINDINGS"] == "0"
+          assert os.environ["SCAN_ANALYSIS_COMPLETE"] == "false"
+          assert not Path("scanbench/fixtures/clean-minimal/project/.scan").exists()
+          print("GITHUB_ACTION_SMOKE=PASS")
+
       - name: Install optional MCP extra from built wheel
         run: python -c "from pathlib import Path; import subprocess,sys; w=next(Path('wheelhouse').glob('*.whl')); subprocess.check_call([sys.executable,'-m','pip','install','--disable-pip-version-check',str(w)+'[mcp]'])"
 

@@ -14,13 +14,14 @@ class CrossPlatformRegressionTests(unittest.TestCase):
     def test_release_control_files_are_plain_utf8_without_bom(self):
         root = Path(__file__).resolve().parents[1]
         for relative in (
-            "pyproject.toml", ".github/workflows/validate.yml", "scripts/v03_acceptance.py",
+            "pyproject.toml", "action.yml", ".github/workflows/validate.yml", "scripts/v03_acceptance.py",
+            "scripts/github_action.py", "src/scan_core/github_ci.py",
             "src/scan_core/mcp_server.py", "src/scan_core/mcp_cli.py",
             "src/scan_core/mcp_app.py", "src/scan_core/mcp_entry.py", "src/scan_core/mcp_semantic.py",
-            "src/scan_core/sarif.py", "tests/test_sarif_export.py",
+            "src/scan_core/sarif.py", "tests/test_sarif_export.py", "tests/test_github_action.py",
             "tests/test_mcp_server.py", "tests/test_mcp_setup.py", "tests/test_mcp_semantic.py",
             "README.md", "docs/v0.4-mcp-foundation.md", "docs/v0.4-mcp-portable-setup.md",
-            "docs/v0.4-semantic-continuation.md", "docs/v0.5-sarif-export.md",
+            "docs/v0.4-semantic-continuation.md", "docs/v0.5-sarif-export.md", "docs/v0.5-github-action.md",
         ):
             with self.subTest(relative=relative):
                 self.assertFalse((root / relative).read_bytes().startswith(b"\xef\xbb\xbf"))
