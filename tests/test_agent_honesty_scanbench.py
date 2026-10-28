@@ -4,6 +4,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+from pathlib import Path
 import unittest
 
 from scan_core.agent_honesty import (
@@ -56,6 +57,16 @@ class AgentHonestyScanBenchTests(unittest.TestCase):
     def test_unknown_scenario_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "Unknown Agent-Honesty"):
             run_agent_honesty_bench(scenario="invented-proof")
+
+    def test_agent_honesty_sources_are_plain_utf8_without_bom(self):
+        root = Path(__file__).resolve().parents[1]
+        for relative in (
+            "src/scan_core/agent_honesty.py",
+            "tests/test_agent_honesty_scanbench.py",
+            "docs/v0.4-agent-honesty-scanbench.md",
+        ):
+            with self.subTest(relative=relative):
+                self.assertFalse((root / relative).read_bytes().startswith(b"\xef\xbb\xbf"))
 
 
 if __name__ == "__main__":
