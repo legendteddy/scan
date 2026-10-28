@@ -1,4 +1,4 @@
-"""Installed-CLI acceptance gate for Scan v0.3.
+"""Installed-CLI acceptance gate for Scan v0.4.
 
 Runs only against synthetic temporary projects. It never executes target project code
 and creates no network remote.
@@ -32,13 +32,13 @@ def scan(*args: str, cwd: Path | None = None, capture: bool = False) -> str:
 def git(root: Path, *args: str) -> str:
     executable = shutil.which("git")
     if executable is None:
-        raise RuntimeError("Git is required by the v0.3 changed-scope acceptance fixture")
+        raise RuntimeError("Git is required by the changed-scope acceptance fixture")
     return run(executable, *args, cwd=root, capture=True).strip()
 
 
 def main() -> int:
     version = scan("--version", capture=True).strip()
-    if version.strip() != "scan 0.3.1":
+    if version.strip() != "scan 0.4.0":
         raise AssertionError(f"unexpected installed CLI version: {version}")
 
     with tempfile.TemporaryDirectory() as directory:
@@ -92,7 +92,7 @@ def main() -> int:
         if git_state["run"]["network_used"]:
             raise AssertionError("Git-scope acceptance unexpectedly recorded network use")
 
-    print("PASS: Scan v0.3 installed-CLI acceptance")
+    print("PASS: Scan v0.4 installed-CLI acceptance")
     return 0
 
 
