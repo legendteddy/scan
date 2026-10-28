@@ -15,6 +15,7 @@ from scan_core.efficiency_benchmark import (
     normalize_host_usage,
     summarize_efficiency,
 )
+from scan_core.semantic_work import SEMANTIC_WORK_SCHEMA_VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -110,11 +111,27 @@ class EfficiencyBenchmarkTests(unittest.TestCase):
             sample_state(reused=0, fresh=5),
             label="baseline",
             usage={"input_tokens": 1000, "output_tokens": 100},
+            work={
+                "schema_version": SEMANTIC_WORK_SCHEMA_VERSION,
+                "producer": {"name": "host", "model": "model"},
+                "artifacts": [
+                    {"artifact_id": "a1", "action": "fresh_read", "access_count": 2},
+                    {"artifact_id": "a2", "action": "fresh_read", "access_count": 1},
+                ],
+            },
         )
         repeat = summarize_efficiency(
             sample_state(reused=4, fresh=1),
             label="repeat",
             usage={"input_tokens": 400, "output_tokens": 80},
+            work={
+                "schema_version": SEMANTIC_WORK_SCHEMA_VERSION,
+                "producer": {"name": "host", "model": "model"},
+                "artifacts": [
+                    {"artifact_id": "a1", "action": "fresh_read", "access_count": 1},
+                    {"artifact_id": "a2", "action": "verified_reuse", "access_count": 1},
+                ],
+            },
         )
         payload = build_efficiency_benchmark([baseline, repeat])
         comparison = payload["comparisons"][0]
@@ -122,20 +139,44 @@ class EfficiencyBenchmarkTests(unittest.TestCase):
         self.assertEqual(comparison["higher_level_classified_fresh_delta"], -4)
         self.assertEqual(comparison["higher_level_classified_verified_reuse_delta"], 4)
         self.assertEqual(comparison["token_delta"]["input_tokens"], -600)
+        self.assertTrue(comparison["semantic_work_comparable"])
+        self.assertTrue(comparison["semantic_work_producer_match"])
+        self.assertEqual(comparison["semantic_work_delta"]["fresh_read_artifact_count"], -1)
+        self.assertEqual(comparison["semantic_work_delta"]["repeat_fresh_read_access_count"], -1)
+        self.assertEqual(comparison["semantic_work_delta"]["verified_reuse_artifact_count"], 1)
         self.assertNotIn("percent", json.dumps(comparison).lower())
 
     def test_script_runs_from_checkout_against_current_validated_state(self) -> None:
         target = ROOT / "scanbench" / "fixtures" / "clean-minimal" / "project"
         with tempfile.TemporaryDirectory() as directory:
             state = Path(directory) / "state.json"
+            work = Path(directory) / "work.json"
             scan_project(ScanConfig(root=target, output_state=state, baseline_mode="none"))
             self.assertTrue(state.exists())
+            state_payload = json.loads(state.read_text(encoding="utf-8"))
+            work.write_text(
+                json.dumps({
+                    "schema_version": SEMANTIC_WORK_SCHEMA_VERSION,
+                    "scan_id": state_payload["run"]["scan_id"],
+                    "snapshot_digest": state_payload["provenance"]["snapshot_digest"],
+                    "producer": {"name": "test-host", "model": "test-model"},
+                    "artifacts": [{
+                        "artifact_id": state_payload["artifacts"][0]["id"],
+                        "action": "fresh_read",
+                        "access_count": 2,
+                    }],
+                    "usage": {"provider": "test-host", "model": "test-model", "input_tokens": 10, "output_tokens": 2},
+                }),
+                encoding="utf-8",
+            )
             completed = subprocess.run(
                 [
                     sys.executable,
                     str(ROOT / "scripts" / "benchmark_efficiency.py"),
                     "--run",
                     f"baseline={state}",
+                    "--work",
+                    f"baseline={work}",
                 ],
                 cwd=ROOT,
                 text=True,
@@ -146,7 +187,11 @@ class EfficiencyBenchmarkTests(unittest.TestCase):
         payload = json.loads(completed.stdout)
         self.assertEqual(payload["schema_version"], BENCHMARK_SCHEMA_VERSION)
         self.assertEqual(payload["runs"][0]["label"], "baseline")
-        self.assertFalse(payload["runs"][0]["host_usage"]["available"])
+        self.assertTrue(payload["runs"][0]["host_usage"]["available"])
+        self.assertEqual(payload["runs"][0]["host_usage"]["total_tokens"], 12)
+        self.assertTrue(payload["runs"][0]["semantic_work"]["available"])
+        self.assertEqual(payload["runs"][0]["semantic_work"]["fresh_read_artifact_count"], 1)
+        self.assertEqual(payload["runs"][0]["semantic_work"]["repeat_fresh_read_access_count"], 1)
 
 
 if __name__ == "__main__":

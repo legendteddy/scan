@@ -17,6 +17,7 @@ from scan_core.efficiency_benchmark import (  # noqa: E402
     load_host_usage,
     summarize_efficiency,
 )
+from scan_core.semantic_work import load_semantic_work_receipt  # noqa: E402
 from scan_core.validate import validate_path  # noqa: E402
 
 
@@ -45,6 +46,13 @@ def _parser() -> argparse.ArgumentParser:
         metavar="LABEL=JSON",
         help="Optional exact host token receipt for a matching run label.",
     )
+    parser.add_argument(
+        "--work",
+        action="append",
+        default=[],
+        metavar="LABEL=JSON",
+        help="Optional semantic-work receipt bound to a matching validated Scan run.",
+    )
     parser.add_argument("--output", type=Path, help="Write benchmark JSON to this path instead of stdout.")
     parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON output.")
     return parser
@@ -56,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
 
     run_specs = [_spec(value, flag="--run") for value in args.run]
     usage_specs = [_spec(value, flag="--usage") for value in args.usage]
+    work_specs = [_spec(value, flag="--work") for value in args.work]
     labels = [label for label, _path in run_specs]
     if len(set(labels)) != len(labels):
         parser.error("--run labels must be unique")
@@ -68,11 +77,23 @@ def main(argv: list[str] | None = None) -> int:
             parser.error(f"--usage label has no matching --run: {label}")
         usage_paths[label] = path
 
+    work_paths: dict[str, Path] = {}
+    for label, path in work_specs:
+        if label in work_paths:
+            parser.error(f"duplicate --work label: {label}")
+        if label not in labels:
+            parser.error(f"--work label has no matching --run: {label}")
+        work_paths[label] = path
+
     summaries = []
     for label, state_path in run_specs:
         state = validate_path(state_path)
-        usage = load_host_usage(usage_paths[label]) if label in usage_paths else None
-        summaries.append(summarize_efficiency(state, label=label, usage=usage))
+        work = load_semantic_work_receipt(work_paths[label], state) if label in work_paths else None
+        receipt_usage = work.get("usage") if work is not None else None
+        if label in usage_paths and receipt_usage is not None:
+            parser.error(f"{label}: use either --usage or receipt usage, not both")
+        usage = load_host_usage(usage_paths[label]) if label in usage_paths else receipt_usage
+        summaries.append(summarize_efficiency(state, label=label, usage=usage, work=work))
 
     payload = build_efficiency_benchmark(summaries)
     text = json.dumps(
