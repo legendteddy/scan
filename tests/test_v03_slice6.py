@@ -15,8 +15,9 @@ class CrossPlatformRegressionTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         for relative in (
             "pyproject.toml", ".github/workflows/validate.yml", "scripts/v03_acceptance.py",
-            "src/scan_core/mcp_server.py", "tests/test_mcp_server.py",
-            "README.md", "docs/v0.4-mcp-foundation.md",
+            "src/scan_core/mcp_server.py", "src/scan_core/mcp_cli.py",
+            "tests/test_mcp_server.py", "tests/test_mcp_setup.py",
+            "README.md", "docs/v0.4-mcp-foundation.md", "docs/v0.4-mcp-portable-setup.md",
         ):
             with self.subTest(relative=relative):
                 self.assertFalse((root / relative).read_bytes().startswith(b"\xef\xbb\xbf"))

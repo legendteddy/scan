@@ -133,10 +133,16 @@ jobs:
         run: |
           python -c "from pathlib import Path; import os,subprocess,sys; w=next((Path(os.environ['RUNNER_TEMP'])/'wheelhouse').glob('*.whl')); subprocess.check_call([sys.executable,'-m','pip','install','--disable-pip-version-check',str(w)+'[mcp]'])"
 
-      - name: Verify packaged MCP bridge
+      - name: Verify packaged MCP bridge and portable setup
         run: |
           scan-mcp --help
-          python -B -m unittest discover -s tests -p "test_mcp_server.py" -v
+          scan-mcp doctor . --json
+          scan-mcp config codex .
+          scan-mcp config claude-desktop .
+          scan-mcp config claude-code .
+          scan-mcp config cursor .
+          scan-mcp config vscode .
+          python -B -m unittest discover -s tests -p "test_mcp*.py" -v
 
   compatibility:
     name: Python ${{ matrix.python-version }} compatibility
@@ -189,6 +195,18 @@ jobs:
         run: |
           scan --version
           scan doctor . --json
+
+      - name: Install optional MCP extra from built wheel
+        run: python -c "from pathlib import Path; import subprocess,sys; w=next(Path('wheelhouse').glob('*.whl')); subprocess.check_call([sys.executable,'-m','pip','install','--disable-pip-version-check',str(w)+'[mcp]'])"
+
+      - name: Verify portable MCP setup on native platform
+        run: |
+          scan-mcp doctor . --json
+          scan-mcp config codex .
+          scan-mcp config claude-desktop .
+          scan-mcp config claude-code .
+          scan-mcp config cursor .
+          scan-mcp config vscode .
 
       - name: Run full Core suite on native filesystem
         run: python -B -m unittest discover -s tests -p "test_*.py" -v
