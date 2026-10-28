@@ -83,6 +83,39 @@ outputs:
   analysis-complete:
     description: Whether semantic analysis is complete according to canonical state
     value: ${{ steps.scan.outputs['analysis-complete'] }}
+  baseline-status:
+    description: Canonical baseline status for the current run
+    value: ${{ steps.scan.outputs['baseline-status'] }}
+  delta-available:
+    description: Whether a validated baseline comparison is available
+    value: ${{ steps.scan.outputs['delta-available'] }}
+  artifacts-added:
+    description: Artifacts added since baseline; empty when no comparison exists
+    value: ${{ steps.scan.outputs['artifacts-added'] }}
+  artifacts-changed:
+    description: Artifacts changed since baseline; empty when no comparison exists
+    value: ${{ steps.scan.outputs['artifacts-changed'] }}
+  artifacts-removed:
+    description: Artifacts removed since baseline; empty when no comparison exists
+    value: ${{ steps.scan.outputs['artifacts-removed'] }}
+  findings-new:
+    description: Findings new since baseline; empty when no comparison exists
+    value: ${{ steps.scan.outputs['findings-new'] }}
+  findings-modified:
+    description: Findings modified since baseline; empty when no comparison exists
+    value: ${{ steps.scan.outputs['findings-modified'] }}
+  findings-resolved:
+    description: Findings absent from current state since baseline; not proof of a fix
+    value: ${{ steps.scan.outputs['findings-resolved'] }}
+  unknowns-new:
+    description: Unknowns new since baseline; empty when no comparison exists
+    value: ${{ steps.scan.outputs['unknowns-new'] }}
+  unknowns-modified:
+    description: Unknowns modified since baseline; empty when no comparison exists
+    value: ${{ steps.scan.outputs['unknowns-modified'] }}
+  unknowns-resolved:
+    description: Unknowns absent from current state since baseline
+    value: ${{ steps.scan.outputs['unknowns-resolved'] }}
   scan-version:
     description: Scan producer version
     value: ${{ steps.scan.outputs['scan-version'] }}

@@ -26,6 +26,9 @@ def github_summary(state: Mapping[str, Any]) -> str:
     checks_complete = bool(coverage.get("checks_complete", False))
     discovery_complete = bool(coverage.get("discovery_complete", False))
 
+    delta = state.get("delta", {}) if isinstance(state.get("delta", {}), Mapping) else {}
+    delta_available = bool(delta.get("available", False))
+
     lines = [
         "## Scan project inspection",
         "",
@@ -43,6 +46,29 @@ def github_summary(state: Mapping[str, Any]) -> str:
         f"| Checks complete | {'yes' if checks_complete else 'no'} |",
         "",
     ]
+    if delta_available:
+        artifact_delta = delta.get("artifacts", {})
+        finding_delta = delta.get("findings", {})
+        unknown_delta = delta.get("unknowns", {})
+        lines.extend([
+            "### Since validated baseline",
+            "",
+            "| Delta | Count |",
+            "| --- | ---: |",
+            f"| Artifacts added | {len(artifact_delta.get('added', []))} |",
+            f"| Artifacts changed | {len(artifact_delta.get('changed', []))} |",
+            f"| Artifacts removed | {len(artifact_delta.get('removed', []))} |",
+            f"| Findings new | {len(finding_delta.get('new', []))} |",
+            f"| Findings modified | {len(finding_delta.get('modified', []))} |",
+            f"| Findings resolved | {len(finding_delta.get('resolved', []))} |",
+            f"| Unknowns new | {len(unknown_delta.get('new', []))} |",
+            f"| Unknowns modified | {len(unknown_delta.get('modified', []))} |",
+            f"| Unknowns resolved | {len(unknown_delta.get('resolved', []))} |",
+            "",
+            "> Resolved means absent from the current state; it is not proof that a problem was fixed.",
+            "",
+        ])
+
     if findings:
         lines.extend([
             "### Finding severity",
@@ -82,6 +108,15 @@ def github_outputs(
     coverage = state.get("coverage", {})
     checks = list(state.get("checks", []))
     artifacts = list(state.get("artifacts", []))
+    delta = state.get("delta", {}) if isinstance(state.get("delta", {}), Mapping) else {}
+    delta_available = bool(delta.get("available", False))
+
+    def delta_count(group: str, key: str) -> str:
+        if not delta_available:
+            return ""
+        rows = delta.get(group, {})
+        return str(len(rows.get(key, []))) if isinstance(rows, Mapping) else "0"
+
     return {
         "state": str(state_path.resolve()),
         "report": str(report_path.resolve()),
@@ -93,6 +128,17 @@ def github_outputs(
         "checks-total": str(len(checks)),
         "artifacts-discovered": str(len(artifacts)),
         "analysis-complete": "true" if coverage.get("analysis_complete") else "false",
+        "baseline-status": str(state.get("baseline", {}).get("status", "unknown")),
+        "delta-available": "true" if delta_available else "false",
+        "artifacts-added": delta_count("artifacts", "added"),
+        "artifacts-changed": delta_count("artifacts", "changed"),
+        "artifacts-removed": delta_count("artifacts", "removed"),
+        "findings-new": delta_count("findings", "new"),
+        "findings-modified": delta_count("findings", "modified"),
+        "findings-resolved": delta_count("findings", "resolved"),
+        "unknowns-new": delta_count("unknowns", "new"),
+        "unknowns-modified": delta_count("unknowns", "modified"),
+        "unknowns-resolved": delta_count("unknowns", "resolved"),
         "scan-version": str(state.get("producer", {}).get("version", "unknown")),
     }
 

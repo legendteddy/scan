@@ -215,6 +215,8 @@ jobs:
           SCAN_SUMMARY: ${{ steps.scan-action.outputs.summary }}
           SCAN_FINDINGS: ${{ steps.scan-action.outputs['findings-count'] }}
           SCAN_ANALYSIS_COMPLETE: ${{ steps.scan-action.outputs['analysis-complete'] }}
+          SCAN_DELTA_AVAILABLE: ${{ steps.scan-action.outputs['delta-available'] }}
+          SCAN_ARTIFACTS_ADDED: ${{ steps.scan-action.outputs['artifacts-added'] }}
         run: |
           import json
           import os
@@ -225,6 +227,8 @@ jobs:
           assert sarif["version"] == "2.1.0"
           assert os.environ["SCAN_FINDINGS"] == "0"
           assert os.environ["SCAN_ANALYSIS_COMPLETE"] == "false"
+          assert os.environ["SCAN_DELTA_AVAILABLE"] == "false"
+          assert os.environ["SCAN_ARTIFACTS_ADDED"] == ""
           assert not Path("scanbench/fixtures/clean-minimal/project/.scan").exists()
           print("GITHUB_ACTION_SMOKE=PASS")
 

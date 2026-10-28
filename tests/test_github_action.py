@@ -46,6 +46,43 @@ class GitHubSummaryTests(unittest.TestCase):
         self.assertEqual(values["findings-count"], "0")
         self.assertEqual(values["analysis-complete"], "false")
         self.assertEqual(values["checks-total"], "14")
+        self.assertEqual(values["delta-available"], "false")
+        self.assertEqual(values["artifacts-added"], "")
+        self.assertEqual(values["findings-new"], "")
+
+    def test_validated_delta_is_rendered_without_overclaiming_resolution(self):
+        state = {
+            "producer": {"version": "0.4.0"},
+            "run": {"scan_id": "scan:test"},
+            "coverage": {"analysis_complete": False, "checks_complete": False, "discovery_complete": True},
+            "artifacts": [],
+            "checks": [],
+            "findings": [],
+            "unknowns": [],
+            "baseline": {"status": "used"},
+            "delta": {
+                "available": True,
+                "artifacts": {"added": ["a1"], "changed": ["a2", "a3"], "removed": ["a4"], "unchanged": []},
+                "findings": {"new": ["f1"], "modified": ["f2"], "resolved": ["f3", "f4"], "persisting": []},
+                "unknowns": {"new": [], "modified": ["u1"], "resolved": ["u2"], "persisting": []},
+            },
+        }
+        text = github_summary(state)
+        self.assertIn("Since validated baseline", text)
+        self.assertIn("Artifacts changed | 2", text)
+        self.assertIn("Findings resolved | 2", text)
+        self.assertIn("not proof that a problem was fixed", text)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            values = github_outputs(
+                state,
+                state_path=root / "state.json", report_path=root / "report.html",
+                sarif_path=root / "results.sarif", summary_path=root / "summary.md",
+            )
+        self.assertEqual(values["delta-available"], "true")
+        self.assertEqual(values["artifacts-changed"], "2")
+        self.assertEqual(values["findings-resolved"], "2")
+        self.assertEqual(values["unknowns-modified"], "1")
 
 
 class CompositeActionTests(unittest.TestCase):
@@ -104,9 +141,56 @@ class CompositeActionTests(unittest.TestCase):
             outputs = github_output.read_text(encoding="utf-8")
             self.assertIn("findings-count=0", outputs)
             self.assertIn("analysis-complete=false", outputs)
+            self.assertIn("delta-available=false", outputs)
+            self.assertIn("artifacts-added=\n", outputs)
             sarif = json.loads(sarif_path.read_text(encoding="utf-8"))
             self.assertEqual(sarif["version"], "2.1.0")
             self.assertEqual(sarif["runs"][0]["results"], [])
+
+    def test_runner_reports_artifact_delta_from_explicit_validated_baseline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            workspace = base / "workspace"
+            target = workspace / "project"
+            target.mkdir(parents=True)
+            (target / "app.py").write_text("x = 1\n", encoding="utf-8")
+            first_out = base / "first"
+            second_out = base / "second"
+            common = os.environ.copy()
+            common.update({
+                "GITHUB_ACTION_PATH": str(ROOT),
+                "GITHUB_WORKSPACE": str(workspace),
+                "SCAN_INPUT_PATH": "project",
+                "SCAN_INPUT_JOB_SUMMARY": "false",
+            })
+            first = dict(common)
+            first.update({"SCAN_INPUT_OUTPUT_DIRECTORY": str(first_out), "SCAN_INPUT_BASELINE": "none"})
+            completed = subprocess.run([sys.executable, str(ROOT / "scripts" / "github_action.py")], cwd=workspace, env=first, text=True, capture_output=True)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            baseline_state = first_out / "state.json"
+            self.assertTrue(baseline_state.exists())
+
+            (target / "app.py").write_text("x = 2\n", encoding="utf-8")
+            (target / "new.py").write_text("y = 1\n", encoding="utf-8")
+            github_output = base / "github-output.txt"
+            second = dict(common)
+            second.update({
+                "GITHUB_OUTPUT": str(github_output),
+                "SCAN_INPUT_OUTPUT_DIRECTORY": str(second_out),
+                "SCAN_INPUT_BASELINE": str(baseline_state),
+            })
+            completed = subprocess.run([sys.executable, str(ROOT / "scripts" / "github_action.py")], cwd=workspace, env=second, text=True, capture_output=True)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            outputs = github_output.read_text(encoding="utf-8")
+            self.assertIn("baseline-status=used", outputs)
+            self.assertIn("delta-available=true", outputs)
+            self.assertIn("artifacts-added=1", outputs)
+            self.assertIn("artifacts-changed=1", outputs)
+            self.assertIn("artifacts-removed=0", outputs)
+            summary = (second_out / "summary.md").read_text(encoding="utf-8")
+            self.assertIn("Since validated baseline", summary)
+            self.assertIn("Artifacts added | 1", summary)
+            self.assertIn("Artifacts changed | 1", summary)
 
     def test_partial_threshold_still_emits_receipts_before_failing(self):
         with tempfile.TemporaryDirectory() as directory:
