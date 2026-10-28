@@ -66,7 +66,7 @@ def normalize_host_usage(usage: Mapping[str, Any] | None) -> dict[str, Any]:
 
 
 def load_host_usage(path: str | Path) -> dict[str, Any]:
-    """Load a small JSON usage receipt supplied by the model host."""
+    """Load and validate a small JSON usage receipt supplied by the model host."""
     candidate = Path(path)
     raw = candidate.read_bytes()
     if len(raw) > MAX_USAGE_BYTES:
@@ -77,7 +77,8 @@ def load_host_usage(path: str | Path) -> dict[str, Any]:
         raise ValueError(f"invalid usage receipt: {error}") from error
     if not isinstance(payload, Mapping):
         raise ValueError("usage receipt must be a JSON object")
-    return normalize_host_usage(payload)
+    normalize_host_usage(payload)
+    return dict(payload)
 
 
 def summarize_efficiency(
@@ -124,7 +125,6 @@ def summarize_efficiency(
         value = group.get(key)
         return len(value) if isinstance(value, list) else 0
 
-    host_usage = normalize_host_usage(usage)
     return {
         "label": label.strip(),
         "scan_id": run.get("scan_id"),
@@ -177,7 +177,7 @@ def summarize_efficiency(
             "priority_paths_count": priority_count,
             "deleted_paths_count": deleted_count,
         },
-        "host_usage": host_usage,
+        "host_usage": normalize_host_usage(usage),
     }
 
 
@@ -188,6 +188,20 @@ def compare_efficiency_runs(baseline: Mapping[str, Any], candidate: Mapping[str,
     before_usage = _mapping(baseline.get("host_usage"))
     after_usage = _mapping(candidate.get("host_usage"))
 
+    common_token_fields = [
+        key for key in _TOKEN_FIELDS
+        if isinstance(before_usage.get(key), int)
+        and not isinstance(before_usage.get(key), bool)
+        and isinstance(after_usage.get(key), int)
+        and not isinstance(after_usage.get(key), bool)
+    ]
+    provider_model_match: bool | None = None
+    if all(isinstance(before_usage.get(key), str) and isinstance(after_usage.get(key), str) for key in ("provider", "model")):
+        provider_model_match = (
+            before_usage.get("provider") == after_usage.get("provider")
+            and before_usage.get("model") == after_usage.get("model")
+        )
+
     comparison: dict[str, Any] = {
         "baseline_label": baseline.get("label"),
         "candidate_label": candidate.get("label"),
@@ -196,19 +210,13 @@ def compare_efficiency_runs(baseline: Mapping[str, Any], candidate: Mapping[str,
         "higher_level_classified_verified_reuse_delta": int(
             after_evidence.get("higher_level_classified_verified_reuse", 0)
         ) - int(before_evidence.get("higher_level_classified_verified_reuse", 0)),
-        "token_usage_comparable": bool(before_usage.get("available")) and bool(after_usage.get("available")),
+        "token_usage_comparable": bool(common_token_fields),
+        "provider_model_match": provider_model_match,
+        "token_delta": {
+            key: int(after_usage[key]) - int(before_usage[key])
+            for key in common_token_fields
+        },
     }
-
-    if comparison["token_usage_comparable"]:
-        token_delta: dict[str, int] = {}
-        for key in _TOKEN_FIELDS:
-            before = before_usage.get(key)
-            after = after_usage.get(key)
-            if isinstance(before, int) and not isinstance(before, bool) and isinstance(after, int) and not isinstance(after, bool):
-                token_delta[key] = after - before
-        comparison["token_delta"] = token_delta
-    else:
-        comparison["token_delta"] = {}
     return comparison
 
 
