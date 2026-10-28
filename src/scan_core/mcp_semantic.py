@@ -5,6 +5,7 @@ into the inspected project or weakening Scan's static/runtime distinction.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
 from pathlib import Path
@@ -15,13 +16,13 @@ from .builder import BuilderError, SemanticStateBuilder
 from .render import render_html
 from .state import canonical_state_json, state_digest
 from .validate import CHECK_CATEGORIES, validate_state
-from .version import __version__
 
 _MAX_SEMANTIC_READ_BYTES = 1_000_000
 _ALLOWED_EVIDENCE_KINDS = {"static", "inferred", "unverified"}
 _ALLOWED_VERIFICATION = {"static", "inferred", "unverified"}
 _ALLOWED_PRODUCERS = {"local-model", "remote-model"}
 _ALLOWED_CHECK_STATUSES = {"assessed", "partial", "not_assessed", "blocked", "not_applicable"}
+_ALLOWED_SEVERITIES = {"critical", "high", "medium", "low", "informational"}
 
 
 class SemanticWorkspaceError(ValueError):
@@ -115,6 +116,12 @@ class SemanticWorkspace:
             raise SemanticWorkspaceError(
                 "artifact bytes no longer match the semantic workspace snapshot; refresh Scan and reset semantic workspace"
             )
+        if b"\x00" in data:
+            raise SemanticWorkspaceError("binary content is not eligible for semantic text evidence")
+        try:
+            data.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise SemanticWorkspaceError("artifact is not valid UTF-8 text for semantic authoring") from error
         return expected
 
     def status(self, current_state: Mapping[str, Any]) -> dict[str, Any]:
@@ -141,22 +148,17 @@ class SemanticWorkspace:
             "network_action": "none",
         }
 
-    def add_component(
-        self, *, name: str, purpose: str, artifact_ids: list[str] | None = None,
-        evidence_ids: list[str] | None = None, boundaries: str = "Not established",
-    ) -> str:
+    def add_component(self, *, name: str, purpose: str, artifact_ids: list[str] | None = None,
+                      evidence_ids: list[str] | None = None, boundaries: str = "Not established") -> str:
         return self.builder.add_component(
             name=_required(name, "name"), purpose=_required(purpose, "purpose"),
-            artifact_ids=_list(artifact_ids, "artifact_ids"),
-            evidence_ids=_list(evidence_ids, "evidence_ids"),
+            artifact_ids=_list(artifact_ids, "artifact_ids"), evidence_ids=_list(evidence_ids, "evidence_ids"),
             boundaries=_required(boundaries, "boundaries"),
         )
 
-    def add_evidence(
-        self, *, artifact_id: str, kind: str, claim: str, result: str, method: str,
-        limitations: str, producer_kind: str, producer_name: str, producer_version: str,
-        check_id: str | None = None,
-    ) -> str:
+    def add_evidence(self, *, artifact_id: str, kind: str, claim: str, result: str, method: str,
+                     limitations: str, producer_kind: str, producer_name: str, producer_version: str,
+                     check_id: str | None = None) -> str:
         if kind not in _ALLOWED_EVIDENCE_KINDS:
             raise SemanticWorkspaceError(
                 "MCP semantic continuation permits static, inferred, or unverified evidence only; observed/runtime proof is not authorized"
@@ -165,29 +167,17 @@ class SemanticWorkspace:
             raise SemanticWorkspaceError("producer_kind must be local-model or remote-model for MCP semantic authoring")
         artifact = self._artifact(_required(artifact_id, "artifact_id"))
         source_digest = self._verify_artifact_bytes(artifact)
-        locator = artifact["locator"]
         return self.builder.add_evidence(
-            artifact_id=artifact_id,
-            locator=locator,
-            kind=kind,
-            claim=_required(claim, "claim"),
-            result=_required(result, "result"),
-            method=_required(method, "method"),
-            limitations=_required(limitations, "limitations"),
-            source_digest=source_digest,
-            producer_kind=producer_kind,
-            producer_name=_required(producer_name, "producer_name"),
-            producer_version=_required(producer_version, "producer_version"),
-            time=_utc_now(),
-            inspection_origin="fresh",
-            evidence_class="static_semantic",
-            check_id=check_id,
+            artifact_id=artifact_id, locator=artifact["locator"], kind=kind,
+            claim=_required(claim, "claim"), result=_required(result, "result"), method=_required(method, "method"),
+            limitations=_required(limitations, "limitations"), source_digest=source_digest,
+            producer_kind=producer_kind, producer_name=_required(producer_name, "producer_name"),
+            producer_version=_required(producer_version, "producer_version"), time=_utc_now(),
+            inspection_origin="fresh", evidence_class="static_semantic", check_id=check_id,
         )
 
-    def add_relationship(
-        self, *, from_id: str, to_id: str, kind: str, explanation: str,
-        evidence_ids: list[str], confidence: str, verification_state: str,
-    ) -> str:
+    def add_relationship(self, *, from_id: str, to_id: str, kind: str, explanation: str,
+                         evidence_ids: list[str], confidence: str, verification_state: str) -> str:
         if verification_state not in _ALLOWED_VERIFICATION:
             raise SemanticWorkspaceError("observed/runtime relationship verification is not authorized in this slice")
         return self.builder.add_relationship(
@@ -197,40 +187,33 @@ class SemanticWorkspace:
             verification_state=verification_state,
         )
 
-    def add_finding(
-        self, *, title: str, impact: str, severity: str, confidence: str,
-        verification_state: str, uncertainty: str, recommendation: str, safe_verification: str,
-        artifact_ids: list[str], evidence_ids: list[str],
-    ) -> str:
+    def add_finding(self, *, title: str, impact: str, severity: str, confidence: str,
+                    verification_state: str, uncertainty: str, recommendation: str, safe_verification: str,
+                    artifact_ids: list[str], evidence_ids: list[str]) -> str:
+        if severity not in _ALLOWED_SEVERITIES:
+            raise SemanticWorkspaceError("severity must be critical, high, medium, low, or informational")
         if verification_state not in _ALLOWED_VERIFICATION:
             raise SemanticWorkspaceError("observed/runtime finding verification is not authorized in this slice")
         return self.builder.add_finding(
-            title=_required(title, "title"), impact=_required(impact, "impact"),
-            severity=_required(severity, "severity"), confidence=_required(confidence, "confidence"),
-            verification_state=verification_state,
-            uncertainty=_required(uncertainty, "uncertainty"),
-            recommendation=_required(recommendation, "recommendation"),
+            title=_required(title, "title"), impact=_required(impact, "impact"), severity=severity,
+            confidence=_required(confidence, "confidence"), verification_state=verification_state,
+            uncertainty=_required(uncertainty, "uncertainty"), recommendation=_required(recommendation, "recommendation"),
             safe_verification=_required(safe_verification, "safe_verification"),
-            artifact_ids=_list(artifact_ids, "artifact_ids"),
-            evidence_ids=_list(evidence_ids, "evidence_ids"),
+            artifact_ids=_list(artifact_ids, "artifact_ids"), evidence_ids=_list(evidence_ids, "evidence_ids"),
         )
 
-    def add_unknown(
-        self, *, question: str, reason: str, impact: str, next_safe_step: str,
-        artifact_ids: list[str] | None = None, evidence_ids: list[str] | None = None,
-    ) -> str:
+    def add_unknown(self, *, question: str, reason: str, impact: str, next_safe_step: str,
+                    artifact_ids: list[str] | None = None, evidence_ids: list[str] | None = None) -> str:
         return self.builder.add_unknown(
             question=_required(question, "question"), reason=_required(reason, "reason"),
             impact=_required(impact, "impact"), next_safe_step=_required(next_safe_step, "next_safe_step"),
             artifact_ids=_list(artifact_ids, "artifact_ids"), evidence_ids=_list(evidence_ids, "evidence_ids"),
         )
 
-    def assess_check(
-        self, *, category: str, status: str, scope: str, method: str,
-        artifact_ids: list[str] | None, evidence_ids: list[str] | None,
-        related_ids: list[str] | None, verification_state: str, result: str,
-        limitations: str, reason: str, next_step: str | None = None,
-    ) -> str:
+    def assess_check(self, *, category: str, status: str, scope: str, method: str,
+                     artifact_ids: list[str] | None, evidence_ids: list[str] | None,
+                     related_ids: list[str] | None, verification_state: str, result: str,
+                     limitations: str, reason: str, next_step: str | None = None) -> str:
         if category not in CHECK_CATEGORIES:
             raise SemanticWorkspaceError(f"unsupported check category: {category}")
         if status not in _ALLOWED_CHECK_STATUSES:
@@ -240,32 +223,25 @@ class SemanticWorkspace:
         if status in {"assessed", "partial"} and not evidence_ids:
             raise SemanticWorkspaceError("assessed/partial checks require substantive evidence")
         return self.builder.assess_check(
-            category=category,
-            status=status,
-            scope=_required(scope, "scope"), method=_required(method, "method"),
-            artifact_ids=_list(artifact_ids, "artifact_ids"),
-            evidence_ids=_list(evidence_ids, "evidence_ids"),
-            related_ids=_list(related_ids, "related_ids"),
-            verification_state=verification_state,
+            category=category, status=status, scope=_required(scope, "scope"), method=_required(method, "method"),
+            artifact_ids=_list(artifact_ids, "artifact_ids"), evidence_ids=_list(evidence_ids, "evidence_ids"),
+            related_ids=_list(related_ids, "related_ids"), verification_state=verification_state,
             result=_required(result, "result"), limitations=_required(limitations, "limitations"),
             reason=_required(reason, "reason"), next_step=next_step,
         )
 
     def mark_artifact_analyzed(self, *, artifact_id: str, evidence_ids: list[str], reason: str) -> None:
         self.builder.mark_artifact_analyzed(
-            _required(artifact_id, "artifact_id"),
-            evidence_ids=_list(evidence_ids, "evidence_ids"),
+            _required(artifact_id, "artifact_id"), evidence_ids=_list(evidence_ids, "evidence_ids"),
             reason=_required(reason, "reason"),
         )
 
-    def finalize(
-        self, *, overview: str | None = None, condition: str | None = None,
-        readiness: str | None = None, strengths: list[str] | None = None,
-        priorities: list[str] | None = None, limitations: str | None = None,
-        remaining: list[str] | None = None, hypotheses: list[str] | None = None,
-        decisions: list[str] | None = None, revalidation: list[str] | None = None,
-        source_needs: list[str] | None = None, analysis_complete: bool | None = None,
-    ) -> dict[str, Any]:
+    def finalize(self, *, overview: str | None = None, condition: str | None = None,
+                 readiness: str | None = None, strengths: list[str] | None = None,
+                 priorities: list[str] | None = None, limitations: str | None = None,
+                 remaining: list[str] | None = None, hypotheses: list[str] | None = None,
+                 decisions: list[str] | None = None, revalidation: list[str] | None = None,
+                 source_needs: list[str] | None = None, analysis_complete: bool | None = None) -> dict[str, Any]:
         self.builder.set_summary(
             overview=overview, condition=condition, readiness=readiness,
             strengths=_list(strengths, "strengths") if strengths is not None else None,
@@ -291,12 +267,7 @@ class SemanticWorkspace:
         return render_html(self.state())
 
 
-def install_semantic_tools(
-    server: Any,
-    *,
-    root: Path,
-    current_state: Callable[[str], dict[str, Any]],
-) -> None:
+def install_semantic_tools(server: Any, *, root: Path, current_state: Callable[[str], dict[str, Any]]) -> None:
     """Install bounded semantic continuation tools and resources onto an MCP server."""
     workspace: SemanticWorkspace | None = None
 
@@ -312,6 +283,8 @@ def install_semantic_tools(
         return ws, current, ws.stale_against(current)
 
     def write_call(callback: Callable[[], Any]) -> dict[str, Any]:
+        ws: SemanticWorkspace | None = None
+        backup: dict[str, Any] | None = None
         try:
             ws, current, stale = current_or_stale()
             if stale:
@@ -321,6 +294,7 @@ def install_semantic_tools(
                     "base_snapshot_digest": ws.snapshot_digest,
                     "current_snapshot_digest": current["provenance"]["snapshot_digest"],
                 }
+            backup = deepcopy(ws.builder.state)
             value = callback()
             state = ws.state()
             result: dict[str, Any] = {"status": "ok", "state_digest": state_digest(state)}
@@ -328,6 +302,8 @@ def install_semantic_tools(
                 result["id"] = value
             return result
         except (BuilderError, SemanticWorkspaceError, AuxiliaryReadError, ValueError) as error:
+            if ws is not None and backup is not None:
+                ws.builder.state = backup
             return _blocked(error)
 
     @server.tool()
@@ -350,22 +326,18 @@ def install_semantic_tools(
             return _blocked(error)
 
     @server.tool()
-    def scan_semantic_add_component(
-        name: str, purpose: str, artifact_ids: list[str] | None = None,
-        evidence_ids: list[str] | None = None, boundaries: str = "Not established",
-    ) -> dict[str, Any]:
+    def scan_semantic_add_component(name: str, purpose: str, artifact_ids: list[str] | None = None,
+                                    evidence_ids: list[str] | None = None,
+                                    boundaries: str = "Not established") -> dict[str, Any]:
         """Add one semantic architecture component using existing artifact/evidence IDs."""
         return write_call(lambda: active().add_component(
-            name=name, purpose=purpose, artifact_ids=artifact_ids,
-            evidence_ids=evidence_ids, boundaries=boundaries,
+            name=name, purpose=purpose, artifact_ids=artifact_ids, evidence_ids=evidence_ids, boundaries=boundaries,
         ))
 
     @server.tool()
-    def scan_semantic_add_evidence(
-        artifact_id: str, kind: str, claim: str, result: str, method: str, limitations: str,
-        producer_kind: str, producer_name: str, producer_version: str,
-        check_id: str | None = None,
-    ) -> dict[str, Any]:
+    def scan_semantic_add_evidence(artifact_id: str, kind: str, claim: str, result: str, method: str,
+                                   limitations: str, producer_kind: str, producer_name: str,
+                                   producer_version: str, check_id: str | None = None) -> dict[str, Any]:
         """Add fresh semantic evidence after rechecking the artifact bytes against the Scan snapshot."""
         return write_call(lambda: active().add_evidence(
             artifact_id=artifact_id, kind=kind, claim=claim, result=result, method=method,
@@ -374,10 +346,9 @@ def install_semantic_tools(
         ))
 
     @server.tool()
-    def scan_semantic_add_relationship(
-        from_id: str, to_id: str, kind: str, explanation: str,
-        evidence_ids: list[str], confidence: str, verification_state: str,
-    ) -> dict[str, Any]:
+    def scan_semantic_add_relationship(from_id: str, to_id: str, kind: str, explanation: str,
+                                       evidence_ids: list[str], confidence: str,
+                                       verification_state: str) -> dict[str, Any]:
         """Add an evidence-linked static/inferred relationship between artifacts/components."""
         return write_call(lambda: active().add_relationship(
             from_id=from_id, to_id=to_id, kind=kind, explanation=explanation,
@@ -385,11 +356,10 @@ def install_semantic_tools(
         ))
 
     @server.tool()
-    def scan_semantic_add_finding(
-        title: str, impact: str, severity: str, confidence: str, verification_state: str,
-        uncertainty: str, recommendation: str, safe_verification: str,
-        artifact_ids: list[str], evidence_ids: list[str],
-    ) -> dict[str, Any]:
+    def scan_semantic_add_finding(title: str, impact: str, severity: str, confidence: str,
+                                  verification_state: str, uncertainty: str, recommendation: str,
+                                  safe_verification: str, artifact_ids: list[str],
+                                  evidence_ids: list[str]) -> dict[str, Any]:
         """Add an evidence-linked finding; runtime/observed verification is rejected."""
         return write_call(lambda: active().add_finding(
             title=title, impact=impact, severity=severity, confidence=confidence,
@@ -399,10 +369,9 @@ def install_semantic_tools(
         ))
 
     @server.tool()
-    def scan_semantic_add_unknown(
-        question: str, reason: str, impact: str, next_safe_step: str,
-        artifact_ids: list[str] | None = None, evidence_ids: list[str] | None = None,
-    ) -> dict[str, Any]:
+    def scan_semantic_add_unknown(question: str, reason: str, impact: str, next_safe_step: str,
+                                  artifact_ids: list[str] | None = None,
+                                  evidence_ids: list[str] | None = None) -> dict[str, Any]:
         """Add an explicit unanswered question instead of converting missing evidence into a pass."""
         return write_call(lambda: active().add_unknown(
             question=question, reason=reason, impact=impact, next_safe_step=next_safe_step,
@@ -410,12 +379,12 @@ def install_semantic_tools(
         ))
 
     @server.tool()
-    def scan_semantic_assess_check(
-        category: str, status: str, scope: str, method: str,
-        verification_state: str, result: str, limitations: str, reason: str,
-        artifact_ids: list[str] | None = None, evidence_ids: list[str] | None = None,
-        related_ids: list[str] | None = None, next_step: str | None = None,
-    ) -> dict[str, Any]:
+    def scan_semantic_assess_check(category: str, status: str, scope: str, method: str,
+                                   verification_state: str, result: str, limitations: str, reason: str,
+                                   artifact_ids: list[str] | None = None,
+                                   evidence_ids: list[str] | None = None,
+                                   related_ids: list[str] | None = None,
+                                   next_step: str | None = None) -> dict[str, Any]:
         """Update one required Scan check category using evidence already in the semantic workspace."""
         return write_call(lambda: active().assess_check(
             category=category, status=status, scope=scope, method=method,
@@ -425,59 +394,53 @@ def install_semantic_tools(
         ))
 
     @server.tool()
-    def scan_semantic_mark_artifact_analyzed(
-        artifact_id: str, evidence_ids: list[str], reason: str = "Semantic analysis completed",
-    ) -> dict[str, Any]:
+    def scan_semantic_mark_artifact_analyzed(artifact_id: str, evidence_ids: list[str],
+                                             reason: str = "Semantic analysis completed") -> dict[str, Any]:
         """Mark one artifact analyzed only when direct substantive evidence supports that artifact."""
         return write_call(lambda: active().mark_artifact_analyzed(
             artifact_id=artifact_id, evidence_ids=evidence_ids, reason=reason,
         ))
 
     @server.tool()
-    def scan_semantic_finalize(
-        overview: str | None = None, condition: str | None = None, readiness: str | None = None,
-        strengths: list[str] | None = None, priorities: list[str] | None = None,
-        limitations: str | None = None, remaining: list[str] | None = None,
-        hypotheses: list[str] | None = None, decisions: list[str] | None = None,
-        revalidation: list[str] | None = None, source_needs: list[str] | None = None,
-        analysis_complete: bool | None = None,
-    ) -> dict[str, Any]:
+    def scan_semantic_finalize(overview: str | None = None, condition: str | None = None,
+                               readiness: str | None = None, strengths: list[str] | None = None,
+                               priorities: list[str] | None = None, limitations: str | None = None,
+                               remaining: list[str] | None = None, hypotheses: list[str] | None = None,
+                               decisions: list[str] | None = None, revalidation: list[str] | None = None,
+                               source_needs: list[str] | None = None,
+                               analysis_complete: bool | None = None) -> dict[str, Any]:
         """Update summary/continuation fields and validate the resulting semantic state."""
+        ws: SemanticWorkspace | None = None
+        backup: dict[str, Any] | None = None
         try:
-            ws, current, stale = current_or_stale()
+            ws, _current, stale = current_or_stale()
             if stale:
-                return {
-                    "status": "stale",
-                    "reason": "deep Scan snapshot changed; reset semantic workspace before finalizing",
-                }
+                return {"status": "stale", "reason": "deep Scan snapshot changed; reset semantic workspace before finalizing"}
+            backup = deepcopy(ws.builder.state)
             state = ws.finalize(
-                overview=overview, condition=condition, readiness=readiness,
-                strengths=strengths, priorities=priorities, limitations=limitations,
-                remaining=remaining, hypotheses=hypotheses, decisions=decisions,
-                revalidation=revalidation, source_needs=source_needs,
+                overview=overview, condition=condition, readiness=readiness, strengths=strengths,
+                priorities=priorities, limitations=limitations, remaining=remaining, hypotheses=hypotheses,
+                decisions=decisions, revalidation=revalidation, source_needs=source_needs,
                 analysis_complete=analysis_complete,
             )
             return {
-                "status": "ok",
-                "state_digest": state_digest(state),
+                "status": "ok", "state_digest": state_digest(state),
                 "analysis_complete": state["coverage"]["analysis_complete"],
                 "checks_complete": state["coverage"]["checks_complete"],
-                "finding_count": len(state["findings"]),
-                "unknown_count": len(state["unknowns"]),
+                "finding_count": len(state["findings"]), "unknown_count": len(state["unknowns"]),
             }
         except (BuilderError, SemanticWorkspaceError, ValueError) as error:
+            if ws is not None and backup is not None:
+                ws.builder.state = backup
             return _blocked(error)
 
     @server.tool()
     def scan_semantic_state() -> dict[str, Any]:
         """Return the validated in-memory Scan 1.4 semantic state; this can be large."""
         try:
-            ws, current, stale = current_or_stale()
+            ws, _current, stale = current_or_stale()
             if stale:
-                return {
-                    "status": "stale",
-                    "reason": "deep Scan snapshot changed; reset semantic workspace before exporting",
-                }
+                return {"status": "stale", "reason": "deep Scan snapshot changed; reset semantic workspace before exporting"}
             state = ws.state()
             return {"status": "ok", "state_digest": state_digest(state), "state": state}
         except (BuilderError, SemanticWorkspaceError, ValueError) as error:
@@ -486,7 +449,7 @@ def install_semantic_tools(
     @server.resource("scan://semantic/state")
     def semantic_state_resource() -> str:
         """Return canonical JSON for the validated in-memory semantic state."""
-        ws, current, stale = current_or_stale()
+        ws, _current, stale = current_or_stale()
         if stale:
             raise SemanticWorkspaceError("semantic workspace is stale; reset before export")
         return canonical_state_json(ws.state())
@@ -494,7 +457,7 @@ def install_semantic_tools(
     @server.resource("scan://semantic/report")
     def semantic_report_resource() -> str:
         """Return a self-contained HTML report rendered from the validated semantic state."""
-        ws, current, stale = current_or_stale()
+        ws, _current, stale = current_or_stale()
         if stale:
             raise SemanticWorkspaceError("semantic workspace is stale; reset before report rendering")
         return ws.report_html()
