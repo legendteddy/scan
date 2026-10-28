@@ -71,6 +71,22 @@ The standalone HTML report is static and useful without JavaScript. Its only scr
 
 The v0.5 SARIF exporter is deliberately narrower than the Scan report: only canonical `findings` become SARIF results. Unknowns, coverage gaps, unassessed checks and an empty finding set are not converted into alerts. File locations remain repository-relative and file-level unless stronger location evidence exists; Scan does not invent line numbers or GitHub line fingerprints. See [the v0.5 SARIF export contract](docs/v0.5-sarif-export.md).
 
+### GitHub Action (v0.5 development)
+
+Scan now includes a reusable composite `action.yml` for CI-native inspection. It runs deterministic Core offline, writes canonical state/report/SARIF/summary receipts to a fresh directory under `RUNNER_TEMP` by default, and appends an evidence-aware GitHub job summary. It does **not** upload SARIF, upload artifacts, post PR comments, execute target code, or turn zero findings into a safety claim.
+
+```yaml
+- uses: actions/checkout@v7
+- id: scan
+  uses: legendteddy/scan@v0.5.0 # intended release tag once v0.5 is published
+  with:
+    path: .
+    mode: deep
+    redact: standard
+```
+
+The action exposes absolute paths for `state`, `report`, `sarif`, and `summary`, plus counts for findings, unknowns, checks and artifacts. Upload/retention and GitHub code-scanning permissions remain explicit workflow-owner decisions. See [the v0.5 GitHub Action contract](docs/v0.5-github-action.md).
+
 ### Scan modes
 
 Scan exposes explicit coverage promises instead of silently sampling:
@@ -266,11 +282,14 @@ Optional visual QA and screenshot refresh: `python scripts/capture_preview.py` (
 
 ```text
 SKILL.md                         Agent instructions and safety boundaries
+action.yml                       Reusable composite GitHub Action
 pyproject.toml                   Scan Core package metadata and `scan` / `scan-mcp` entry points
+scripts/github_action.py         GitHub Action execution boundary
 src/scan_core/                   Deterministic Scan Core package
 src/scan_core/baseline.py        Local-only bounded baseline resolver
 src/scan_core/compare.py         Pure deterministic 1.3/1.4 state comparison
 src/scan_core/git_change.py      Local-only advisory Git changed-scope integration
+src/scan_core/github_ci.py       GitHub summary/output helpers
 src/scan_core/reuse.py           Strict evidence freshness/reuse decision engine
 src/scan_core/render.py          Validated canonical-state HTML renderer
 src/scan_core/sarif.py           Deterministic SARIF 2.1.0 finding exporter
@@ -298,6 +317,7 @@ docs/v0.2-compatibility.md       Python/schema/config/ScanBench compatibility bo
 docs/v0.3-technical-spec.md      Approved repeat-scan baseline/diff contract
 docs/v0.4-mcp-foundation.md      Read-only MCP bridge contract
 docs/v0.5-sarif-export.md        SARIF 2.1.0 interoperability contract
+docs/v0.5-github-action.md       Reusable CI action and job-summary contract
 ```
 
 ## Contribute and report security issues
