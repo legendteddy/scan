@@ -44,6 +44,7 @@ def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool)
     parser.add_argument("--sensitive-path", action="append", default=None)
     parser.add_argument("--max-file-bytes", type=int, default=None)
     parser.add_argument("--max-total-bytes", type=int, default=None)
+    parser.add_argument("--git-metadata-root", action="append", type=Path, default=[], help="Authorize one exact external Git metadata directory for bounded provenance reads")
     parser.add_argument("--follow-internal-links", action="store_true", default=None)
 
 
@@ -153,6 +154,7 @@ def _resolved_config(
         reuse_enabled=reuse_enabled,
         max_baseline_state_bytes=settings.max_baseline_state_bytes,
         changed_since=getattr(args, "changed_since", None),
+        git_metadata_roots=tuple(getattr(args, "git_metadata_root", ())),
     )
 
 

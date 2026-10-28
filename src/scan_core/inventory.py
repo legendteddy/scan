@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .config import ScanConfig, mode_excludes
+from .auxiliary import is_link_or_reparse
 from .errors import SourceError
 from .ids import artifact_id, normalize_locator, sha256_bytes
 
@@ -174,7 +175,7 @@ def build_inventory(config: ScanConfig, *, _internal_ignores: tuple[str, ...] = 
                 continue
 
             mode = metadata.st_mode
-            if stat.S_ISLNK(mode):
+            if is_link_or_reparse(metadata):
                 try:
                     raw_target = os.readlink(path)
                 except OSError as error:

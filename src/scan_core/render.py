@@ -257,24 +257,25 @@ def _baseline_section(state: Mapping[str, Any]) -> str:
 
 def _coverage_rows(state: Mapping[str, Any]) -> str:
     coverage = state["coverage"]
-    artifact_count = coverage["discovered_artifact_count"]
-    statuses = coverage["counts_by_status"]
-    analyzed = statuses.get("analyzed", 0)
-    content_read = statuses.get("content_read", 0)
-    checks = state["checks"]
-    check_counts = coverage["counts_by_check_status"]
-    assessed = check_counts.get("assessed", 0)
+    artifacts = state["artifacts"]
+    def count(status: str, origin: str | None = None) -> int:
+        return sum(row["status"] == status and (origin is None or row["inspection_origin"] == origin) for row in artifacts)
+    assessed = sum(row["status"] == "assessed" for row in state["checks"])
     rows = [
-        ("Artifact discovery", f"{artifact_count} inventoried", 100 if coverage["discovery_complete"] else 70),
-        ("Content/static depth", f"{content_read} content-read · {analyzed} analyzed", 100 if coverage["analysis_complete"] else 35),
-        ("Checks assessed", f"{assessed} of {len(checks)}", round(100 * assessed / len(checks)) if checks else 0),
-        ("Runtime verification", "Not established", 0),
+        ("Artifact discovery", "Complete" if coverage["discovery_complete"] else "Incomplete", f"{len(artifacts)} inventoried"),
+        ("Semantic analysis", "Complete" if coverage["analysis_complete"] else "Incomplete",
+         f'{count("analyzed", "fresh")} fresh analyzed · {count("analyzed", "verified_reuse")} reused analyzed'),
+        ("Content reading", "Separate from semantic analysis",
+         f'{count("content_read", "fresh")} fresh content-read · {count("content_read", "verified_reuse")} reused content-read'),
+        ("Limited artifact depth", "Not analyzed",
+         f'{count("metadata_only")} metadata-only · {count("partial")} partial · {count("not_inspected")} not inspected'),
+        ("Checks assessed", "Assessment is not a passing result", f"{assessed} of {len(state['checks'])}"),
+        ("Runtime verification", "Not established", "No runtime coverage denominator"),
     ]
     return "".join(
         '<div class="coverage-row">'
-        f'<span>{_h(label)}</span><div class="bar" aria-hidden="true"><i style="width:{width}%"></i></div>'
-        f'<b>{_h(value)}</b></div>'
-        for label, value, width in rows
+        f'<span>{_h(label)}</span><span>{_h(status)}</span><b>{_h(value)}</b></div>'
+        for label, status, value in rows
     )
 
 

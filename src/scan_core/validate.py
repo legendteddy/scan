@@ -13,8 +13,9 @@ from html.parser import HTMLParser
 from pathlib import Path
 import re
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
-from .errors import UnsupportedSchemaError, ValidationError
+from .errors import UnsafeReportError, UnsupportedSchemaError, ValidationError
 
 STATE_ID = 'project-anatomy-state'
 STATUSES = {'discovered', 'metadata_only', 'content_read', 'analyzed', 'partial',
@@ -87,9 +88,64 @@ class StateParser(HTMLParser):
         self._count_text = []
         self.external_resources = []
         self.executable_scripts = 0
+        self.safety_errors = []
+        self._in_style = False
+        self._style_text = []
+
+    def _css_safety(self, value):
+        # This is a conservative safety filter, not a CSS structure parser.
+        # Decode CSS escapes/comments before checking all resource/active forms.
+        value = re.sub(r'/\*.*?\*/', '', value, flags=re.S)
+        def unescape(match):
+            raw = match.group(1)
+            try:
+                return chr(int(raw.strip(), 16)) if re.fullmatch(r'[0-9a-fA-F]{1,6}\s?', raw) else raw
+            except (ValueError, OverflowError):
+                return '\ufffd'
+        value = re.sub(r'\\([0-9a-fA-F]{1,6}\s?|[^\r\n])', unescape, value).lower()
+        compact = re.sub(r'\s+', '', value)
+        if re.search(r'(?:^|[;{])behavior:', compact) or any(token in compact for token in ('@import', 'url(', 'expression(', 'image-set(', 'image(', 'src(', '-moz-binding:', 'http:', 'https:', 'javascript:', 'vbscript:')):
+            self.safety_errors.append('CSS active content or resource reference')
+
+    def _markup_safety(self, tag, pairs):
+        # Keep browser foreign-content parsing and submission/plugin surfaces out
+        # of a static report. Ordinary external evidence anchors remain allowed.
+        if tag in {'iframe', 'object', 'embed', 'applet', 'frame', 'frameset', 'portal',
+                   'base', 'form', 'input', 'button', 'select', 'textarea', 'svg', 'math',
+                   'link', 'template'}:
+            self.safety_errors.append('prohibited active element: ' + tag)
+        attrs = dict(pairs)
+        if len(attrs) != len(pairs):
+            self.safety_errors.append('duplicate HTML attributes')
+        if tag == 'script' and not (attrs.get('id') == STATE_ID and attrs.get('type') == 'application/json' and 'src' not in attrs):
+            self.safety_errors.append('executable scripts or additional state scripts are prohibited')
+        if tag == 'meta' and 'http-equiv' in attrs:
+            self.safety_errors.append('HTTP-equivalent metadata is prohibited')
+        for name, value in pairs:
+            if name.startswith('on') or name in {'srcdoc', 'srcset', 'ping', 'attributionsrc', 'lowsrc', 'dynsrc', 'action', 'formaction', 'codebase', 'archive', 'manifest', 'background', 'data', 'xlink:href'}:
+                self.safety_errors.append('prohibited active/resource attribute: ' + name)
+            if name == 'style' and value:
+                self._css_safety(value)
+            if name in {'href', 'src', 'poster', 'cite', 'longdesc'} and value is not None:
+                normalized = re.sub(r'[\x00-\x20\x7f]', '', value)
+                try:
+                    scheme = urlsplit(normalized).scheme.lower()
+                except ValueError:
+                    scheme = 'invalid'
+                if tag == 'a' and name == 'href':
+                    safe = normalized.startswith('#') or (scheme in {'http', 'https', 'mailto'})
+                else:
+                    # Only fragment resources and embedded raster data are inert.
+                    safe = normalized.startswith('#') or (tag == 'img' and name == 'src' and bool(re.fullmatch(r'data:image/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+', normalized)))
+                if not safe:
+                    self.safety_errors.append('active URL or external network resources in ' + name)
 
     def handle_starttag(self, tag, attrs):
+        self._markup_safety(tag, attrs)
         attrs = dict(attrs)
+        if tag == 'style':
+            self._in_style = True
+            self._style_text = []
         if attrs.get('id') == STATE_ID:
             require(tag == 'script' and attrs.get('type') == 'application/json',
                     'State ID must belong to an inert application/json script')
@@ -112,6 +168,9 @@ class StateParser(HTMLParser):
                 self.external_resources.append(resource)
 
     def handle_endtag(self, tag):
+        if tag == 'style':
+            self._css_safety(''.join(self._style_text))
+            self._in_style = False
         if tag == 'script':
             self.active = False
         if self._count_key is not None and tag == self._count_tag:
@@ -121,10 +180,18 @@ class StateParser(HTMLParser):
             self._count_text = []
 
     def handle_data(self, data):
+        if self._in_style:
+            self._style_text.append(data)
         if self.active:
             self.blocks[-1] += data
         if self._count_key is not None:
             self._count_text.append(data)
+
+    def handle_startendtag(self, tag, attrs):
+        if tag in {'script', 'style'}:
+            self.safety_errors.append('script/style cannot use self-closing syntax')
+        self.handle_starttag(tag, attrs)
+        self.handle_endtag(tag)
 
 
 def unique_keys(pairs):
@@ -694,9 +761,17 @@ def _parse_report(path: str | Path):
     parser = StateParser()
     with open(path, encoding='utf-8') as stream:
         parser.feed(stream.read())
+    parser.close()
     require(len(parser.blocks) == 1, 'Expected exactly one authoritative ' + STATE_ID + ' block')
+    if parser._in_style:
+        parser._css_safety(''.join(parser._style_text))
+    if parser.safety_errors:
+        raise UnsafeReportError('Unsafe/non-self-contained HTML: ' + '; '.join(sorted(set(parser.safety_errors))))
     require(not any(c in parser.blocks[0] for c in '<>&'), 'Escape <, > and & in embedded JSON')
-    state = json.loads(parser.blocks[0], object_pairs_hook=unique_keys, parse_constant=reject_constant)
+    try:
+        state = json.loads(parser.blocks[0], object_pairs_hook=unique_keys, parse_constant=reject_constant)
+    except json.JSONDecodeError as error:
+        raise ValidationError('Invalid embedded report state JSON') from error
     return parser, state
 
 

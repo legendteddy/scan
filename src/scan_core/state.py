@@ -66,6 +66,8 @@ def configuration_digest(config: ScanConfig) -> str:
         "max_baseline_state_bytes": config.max_baseline_state_bytes,
         "changed_since": config.changed_since,
     }
+    if config.git_metadata_roots:
+        payload["git_metadata_roots"] = sorted(str(Path(root).absolute()) for root in config.git_metadata_roots)
     return _sha256_json(payload)
 
 

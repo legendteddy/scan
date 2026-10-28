@@ -72,9 +72,11 @@ class ScanConfig:
     reuse_enabled: bool = True
     max_baseline_state_bytes: int = 64_000_000
     changed_since: str | None = None
+    git_metadata_roots: tuple[Path, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "root", Path(self.root))
+        object.__setattr__(self, "git_metadata_roots", tuple(Path(root).absolute() for root in self.git_metadata_roots))
         if self.output_state is not None:
             object.__setattr__(self, "output_state", Path(self.output_state))
         if self.output_html is not None:

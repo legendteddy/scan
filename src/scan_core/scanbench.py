@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import shutil
 import stat
+import struct
 import tempfile
 from typing import Any, Iterator
 
@@ -60,6 +61,7 @@ class FixtureResult:
     name: str
     passed: bool
     assertions: tuple[AssertionResult, ...]
+    setup_notes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,7 @@ class BenchResult:
                 {
                     "name": fixture.name,
                     "passed": fixture.passed,
+                    "setup_notes": list(fixture.setup_notes),
                     "assertions": [
                         {
                             "dimension": row.dimension,
@@ -190,6 +193,44 @@ def _lock_file(path: Path) -> Iterator[None]:
         path.chmod(original)
 
 
+def _create_windows_junction(link: Path, target: Path) -> None:
+    """Create a native mount-point reparse fixture without a shell or privilege.
+
+    Fixture paths remain data even if a custom fixture name has shell characters.
+    TemporaryDirectory owns cleanup of the junction and synthetic target.
+    """
+    if os.name != 'nt':
+        raise OSError('Windows junctions are unavailable on this platform')
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    create_file = kernel.CreateFileW
+    create_file.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32,
+                            ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p]
+    create_file.restype = ctypes.c_void_p
+    control = kernel.DeviceIoControl
+    control.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_uint32,
+                        ctypes.c_void_p, ctypes.c_uint32, ctypes.POINTER(ctypes.c_uint32), ctypes.c_void_p]
+    control.restype = ctypes.c_int
+    close_handle = kernel.CloseHandle
+    close_handle.argtypes = [ctypes.c_void_p]
+    close_handle.restype = ctypes.c_int
+    substitute = ('\\??\\' + str(target.resolve())).encode('utf-16-le')
+    printable = str(target.resolve()).encode('utf-16-le')
+    names = substitute + b'\0\0' + printable + b'\0\0'
+    data = struct.pack('<LHHHHHH', 0xA0000003, len(names) + 8, 0,
+                       0, len(substitute), len(substitute) + 2, len(printable)) + names
+    link.mkdir()
+    handle = create_file(str(link), 0x40000000, 0, None, 3, 0x02200000, None)
+    if handle in (None, ctypes.c_void_p(-1).value):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        returned = ctypes.c_uint32()
+        buffer = ctypes.create_string_buffer(data)
+        if not control(handle, 0x000900A4, buffer, len(data), None, 0, ctypes.byref(returned), None):
+            raise ctypes.WinError(ctypes.get_last_error())
+    finally:
+        close_handle(handle)
+
+
 @contextmanager
 def _fixture_setup(root: Path, setup: dict[str, Any], temp_root: Path) -> Iterator[dict[str, Path]]:
     marker_paths: dict[str, Path] = {}
@@ -206,7 +247,12 @@ def _fixture_setup(root: Path, setup: dict[str, Any], temp_root: Path) -> Iterat
         try:
             os.symlink(outside, link, target_is_directory=True)
         except (OSError, NotImplementedError) as error:
-            raise CommandError(f"ScanBench symlink fixture unavailable: {error}") from error
+            if os.name != 'nt':
+                raise CommandError(f"ScanBench symlink fixture unavailable: {error}") from error
+            try:
+                _create_windows_junction(link, outside)
+            except OSError as junction_error:
+                raise CommandError("ScanBench directory-link fixture unavailable: symlink and junction creation failed") from junction_error
 
     marker = setup.get("marker_absent")
     if isinstance(marker, str) and marker:
@@ -344,6 +390,12 @@ def _run_fixture(bench_root: Path, fixture_name: str) -> FixtureResult:
         if not isinstance(setup, dict):
             raise CommandError(f"ScanBench fixture {fixture_name} setup must be an object")
         with _fixture_setup(project, setup, temp_root) as markers:
+            setup_notes = ()
+            link_setup = setup.get('external_symlink')
+            if isinstance(link_setup, dict):
+                link = project / link_setup.get('link', 'escape')
+                if not link.is_symlink():
+                    setup_notes = ('Native Windows junction/reparse escape exercised; symlink creation privilege unavailable',)
             config = _scan_config(project, meta.get("config", {}), state_path, report_path)
             inventory = build_inventory(config)
             first_snapshot = build_snapshot(inventory)
@@ -376,7 +428,7 @@ def _run_fixture(bench_root: Path, fixture_name: str) -> FixtureResult:
                     passed=passed,
                     detail=detail,
                 ))
-    return FixtureResult(name=fixture_name, passed=all(row.passed for row in rows), assertions=tuple(rows))
+    return FixtureResult(name=fixture_name, passed=all(row.passed for row in rows), assertions=tuple(rows), setup_notes=setup_notes)
 
 
 def run_bench(*, fixture: str | None = None, bench_root: str | Path | None = None) -> BenchResult:
@@ -406,6 +458,8 @@ def format_bench(result: BenchResult) -> str:
     lines: list[str] = []
     for fixture in result.fixtures:
         lines.append(f"{'PASS' if fixture.passed else 'FAIL'} {fixture.name}")
+        for note in fixture.setup_notes:
+            lines.append('  ' + note)
         for row in fixture.assertions:
             if not row.passed:
                 lines.append(f"  FAIL [{DIMENSION_LABELS[row.dimension]}] {row.assertion}: {row.detail}")

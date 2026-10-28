@@ -6,7 +6,10 @@ import configparser
 from dataclasses import dataclass
 from pathlib import Path
 import re
+import os
 from urllib.parse import urlsplit, urlunsplit
+
+from .auxiliary import AuxiliaryReadError, auxiliary_path, auxiliary_text
 
 
 _HEX_COMMIT = re.compile(r"^[0-9a-fA-F]{40,64}$")
@@ -32,15 +35,6 @@ class GitProvenance:
             "remotes": [{"name": name, "url": url} for name, url in self.remotes],
             "limitations": list(self.limitations),
         }
-
-
-def _bounded_text(path: Path, limit: int = 64_000) -> str | None:
-    try:
-        if not path.is_file() or path.stat().st_size > limit:
-            return None
-        return path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return None
 
 
 def _sanitize_remote(value: str) -> str:
@@ -70,40 +64,55 @@ def _sanitize_remote(value: str) -> str:
     return urlunsplit((parts.scheme, hostname, parts.path, "", ""))
 
 
-def _resolve_git_dir(root: Path) -> tuple[Path | None, list[str]]:
-    marker = root / ".git"
+def _authorized_directory(root: Path, candidate: Path, allowed: tuple[Path, ...]) -> Path | None:
+    # In-project indirection is allowed; external roots must match exactly an
+    # explicit invocation grant, never a grant to a parent containing other data.
+    try:
+        relative = candidate.absolute().relative_to(root)
+        return auxiliary_path(root, relative)
+    except (ValueError, AuxiliaryReadError):
+        pass
+    for grant in allowed:
+        if candidate.absolute() == grant.absolute():
+            try:
+                # Check ancestors too: grants cannot authorize a reparse escape.
+                return auxiliary_path(Path(candidate.anchor), candidate.absolute().relative_to(candidate.anchor))
+            except AuxiliaryReadError:
+                return None
+    return None
+
+
+def _resolve_git_dir(root: Path, allowed: tuple[Path, ...] = ()) -> tuple[Path | None, list[str]]:
     limitations: list[str] = []
+    try:
+        marker = auxiliary_path(root, ".git")
+    except AuxiliaryReadError:
+        return None, ["Git metadata marker could not be read within the declared scan root"]
     if marker.is_dir():
-        try:
-            candidate = marker.resolve(strict=True)
-            candidate.relative_to(root.resolve(strict=True))
-        except (OSError, ValueError):
-            limitations.append("Git metadata directory resolves outside the declared scan root and was not followed")
-            return None, limitations
-        return candidate, limitations
-    if marker.is_file():
-        text = _bounded_text(marker, 4096)
-        if text is None or not text.lower().startswith("gitdir:"):
-            limitations.append("Git indirection file could not be read safely")
-            return None, limitations
-        raw = text.split(":", 1)[1].strip()
-        candidate = (root / raw).resolve(strict=False) if not Path(raw).is_absolute() else Path(raw).resolve(strict=False)
-        try:
-            candidate.relative_to(root.resolve(strict=True))
-        except (OSError, ValueError):
-            limitations.append("Git metadata directory is outside the declared scan root and was not followed")
-            return None, limitations
-        return candidate, limitations
-    return None, limitations
+        return marker, limitations
+    text = auxiliary_text(root, ".git", max_bytes=4096)
+    if text is None or not text.lower().startswith("gitdir:"):
+        return None, ["Git indirection file could not be read safely"]
+    raw = text.split(":", 1)[1].strip()
+    # Worktree pointer paths may legitimately contain '..'; normalize only this
+    # pointer, then require a contained path or an exact invocation grant.
+    candidate = Path(raw) if Path(raw).is_absolute() else root / raw
+    candidate = Path(os.path.abspath(candidate))
+    authorized = _authorized_directory(root, candidate, allowed)
+    if authorized is None or not authorized.is_dir():
+        return None, ["Git metadata directory is outside the authorized scope or unsafe; not followed"]
+    if not authorized.is_relative_to(root):
+        limitations.append("External Git metadata explicitly authorized for bounded HEAD/ref/config reads only")
+    return authorized, limitations
 
 
 def _commit_for_ref(git_dir: Path, ref: str) -> str | None:
-    loose = _bounded_text(git_dir / Path(*ref.split("/")), 4096)
-    if loose:
+    loose = auxiliary_text(git_dir, ref, max_bytes=4096)
+    if loose and loose.strip():
         candidate = loose.strip().splitlines()[0]
         if _HEX_COMMIT.fullmatch(candidate):
             return candidate.lower()
-    packed = _bounded_text(git_dir / "packed-refs", 2_000_000)
+    packed = auxiliary_text(git_dir, "packed-refs", max_bytes=2_000_000)
     if packed:
         for line in packed.splitlines():
             if not line or line.startswith(("#", "^")):
@@ -118,7 +127,7 @@ def _commit_for_ref(git_dir: Path, ref: str) -> str | None:
 
 
 def _read_remotes(git_dir: Path) -> tuple[tuple[str, str], ...]:
-    text = _bounded_text(git_dir / "config", 1_000_000)
+    text = auxiliary_text(git_dir, "config", max_bytes=1_000_000)
     if text is None:
         return ()
     parser = configparser.RawConfigParser(interpolation=None, strict=False)
@@ -137,23 +146,36 @@ def _read_remotes(git_dir: Path) -> tuple[tuple[str, str], ...]:
     return tuple(sorted(rows))
 
 
-def inspect_git_provenance(root: str | Path) -> GitProvenance:
+def inspect_git_provenance(root: str | Path, *, metadata_roots: tuple[Path, ...] = ()) -> GitProvenance:
     """Return bounded repository identity without invoking Git or reading object packs."""
     root_path = Path(root).resolve(strict=True)
     marker = root_path / ".git"
     if not marker.exists():
         return GitProvenance(detected=False)
 
-    git_dir, limitations = _resolve_git_dir(root_path)
+    git_dir, limitations = _resolve_git_dir(root_path, metadata_roots)
     if git_dir is None:
         return GitProvenance(detected=True, limitations=tuple(limitations))
 
-    head_text = _bounded_text(git_dir / "HEAD", 4096)
-    if not head_text:
+    common_dir = git_dir
+    common = auxiliary_text(git_dir, "commondir", max_bytes=4096)
+    if common is not None:
+        raw_common = Path(common.strip())
+        candidate = Path(os.path.abspath(git_dir / raw_common))
+        authorized = _authorized_directory(root_path, candidate, metadata_roots)
+        if authorized is None or not authorized.is_dir():
+            limitations.append("Git common metadata directory is outside the authorized scope or unsafe; not followed")
+        else:
+            common_dir = authorized
+            if not authorized.is_relative_to(root_path):
+                limitations.append("External Git common metadata explicitly authorized for bounded ref/config reads only")
+
+    head_text = auxiliary_text(git_dir, "HEAD", max_bytes=4096)
+    if not head_text or not head_text.strip():
         limitations.append("Git HEAD could not be read")
         return GitProvenance(
             detected=True,
-            remotes=_read_remotes(git_dir),
+            remotes=_read_remotes(common_dir),
             limitations=tuple(limitations),
         )
 
@@ -164,7 +186,14 @@ def inspect_git_provenance(root: str | Path) -> GitProvenance:
         ref = head.split(":", 1)[1].strip()
         if ref.startswith("refs/heads/"):
             branch = ref[len("refs/heads/"):]
-        commit = _commit_for_ref(git_dir, ref)
+        if not ref.startswith("refs/") or ".." in ref.replace("\\", "/").split("/") or "\\" in ref or ":" in ref:
+            limitations.append("Unsafe Git HEAD reference rejected")
+            head = None
+            branch = None
+        else:
+            commit = _commit_for_ref(common_dir, ref)
+            if commit is None:
+                limitations.append("Git reference unavailable, unsafe, invalid or beyond metadata byte limits")
     elif _HEX_COMMIT.fullmatch(head):
         commit = head.lower()
 
@@ -176,6 +205,6 @@ def inspect_git_provenance(root: str | Path) -> GitProvenance:
         head=head,
         branch=branch,
         commit=commit,
-        remotes=_read_remotes(git_dir),
+        remotes=_read_remotes(common_dir),
         limitations=tuple(limitations),
     )

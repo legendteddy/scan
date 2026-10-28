@@ -22,7 +22,7 @@ Use semantic headings and text alternatives for diagrams. Keep contrast readable
 
 ## Populate and check
 
-Escape ordinary text slots. Generate *_HTML slots only from agent-authored markup containing escaped data. Serialize STATE_JSON using the report contract's escaping rules. Fill or remove every `{{...}}` placeholder; do not ship the unfinished shell. Use the current supported Scan state contract (currently 1.3 for new reports), populate the dynamic `STATE_SCHEMA_VERSION` slot from the embedded state, and validate the report. The historical 1.2 demo remains historical. The shell is presentation scaffolding, not evidence and not a valid report until populated.
+Escape ordinary text slots. Generate *_HTML slots only from agent-authored markup containing escaped data. Serialize STATE_JSON using the report contract's escaping rules. Fill or remove every `{{...}}` placeholder; do not ship the unfinished shell. Use the current supported Scan state contract (currently 1.4 for new reports), populate the dynamic `STATE_SCHEMA_VERSION` slot from the embedded state, and validate the report. The historical 1.2 demo remains historical. The shell is presentation scaffolding, not evidence and not a valid report until populated.
 
 Inspect desktop, narrow-screen and print output when rendering tools are available. Check hero wrapping, card height, anatomy labels/arrows, evidence tables and consistency of visible/embedded counts. If rendering is unavailable, record that limit rather than claiming visual verification. Never weaken evidence requirements to preserve a visual arrangement.
 
@@ -39,3 +39,5 @@ Inspect the populated report, not just the empty shell. Specifically check label
 ## Check-coverage presentation
 
 Include a visible “What was checked” section, using the existing appendix and keyboard-focusable table-scroll patterns. Use plain-language labels for the five check statuses. Keep scope, method, result/limitations and evidence readable; detailed machine category/ID strings can stay in the appendix. Check-completion counts must not imply project health or current test success. Preserve the established visual identity.
+
+Current authoring version: **1.4**. Historically accepted validation versions: **1.2 and 1.3** (plus current 1.4). Preserve historical artifacts and their original version labels. See `report-contract.md` for baseline, delta, freshness and visible count requirements. Coverage counts must come from canonical records; use qualitative status when no measured denominator exists.
