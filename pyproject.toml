@@ -1,24 +1,29 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "scan-skill"
-version = "0.3.0.dev4"
+version = "0.3.0.dev5"
 description = "Evidence-backed whole-project inspection core and agent skill"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "legendteddy" }]
 dependencies = []
 classifiers = [
   "Development Status :: 3 - Alpha",
-  "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
+
+[project.urls]
+Homepage = "https://github.com/legendteddy/scan"
+Repository = "https://github.com/legendteddy/scan"
+Issues = "https://github.com/legendteddy/scan/issues"
 
 [project.scripts]
 scan = "scan_core.cli:main"

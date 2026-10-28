@@ -9,11 +9,27 @@ Scan is an **evidence-backed whole-project inspection** project with two layers:
 
 **Coverage ≠ confidence.** Finding a file, reading it, assessing a check, and verifying runtime behavior are different things. Scan makes those differences visible.
 
-![Screenshot of the synthetic Pocket Ledger Scan report, showing coverage and explicit unknowns](assets/demo-preview.png)
+## Start here: run Scan locally
 
-[Explore the synthetic fixture](examples/demo-project/README.md) · [Download the example HTML report](examples/demo-report.html) · [Read the report contract](references/report-contract.md)
+The v0.3 implementation is **not published to PyPI yet**. Install from a source checkout so the command and bundled evidence assets come from the exact code you reviewed:
 
-> **Demo disclosure:** The linked report is a hand-reviewed **synthetic worked example** generated from five fictional files. It demonstrates the Scan 1.2 format and validator, **not** a claim that an autonomous agent scanned a real repository. The example did not execute the inspected code.
+```bash
+git clone https://github.com/legendteddy/scan.git
+cd scan
+python -m pip install .
+scan doctor .
+scan . --offline
+```
+
+Change the project, then run the same scan again:
+
+```bash
+scan . --offline
+```
+
+The second run uses the previous local `.scan/state.json` as its baseline and reports what was added, changed, removed or unchanged, while keeping fresh and reused evidence separate. `scan doctor .` is an offline, non-destructive readiness diagnostic: it checks installed package assets, target access and optional Git support, and uses a temporary local output probe that it removes before returning. It does not install, repair or contact anything.
+
+Registry commands such as `pipx install scan-skill` or `uv tool install scan-skill` are intentionally **not** presented as current installation instructions until a registry package is actually published.
 
 ## What makes Scan different?
 
@@ -26,28 +42,15 @@ Scan is an **evidence-backed whole-project inspection** project with two layers:
 
 Scan can guide inspection of source repositories, websites, document collections, archives, binaries and mixed folders. Actual depth depends on access, file types, safety limits and the agent's available tools.
 
-## Try the proof in a minute
+For the concrete false-confidence failure mode Scan is designed to prevent, read [Why Scan exists](docs/why-scan.md).
 
-You only need **Python 3.9+** to validate the example report; the validator and its tests use the standard library.
-
-\`\`\`bash
-git clone https://github.com/legendteddy/scan.git
-cd scan
-python scripts/validate_report.py examples/demo-report.html
-python scripts/build_demo_report.py --check
-python -m unittest discover -s scripts -p "test_*.py" -v
-\`\`\`
-
-Expected: the example report passes the structural contract, the generated HTML matches the checked-in version, and the validator tests pass. Open \`examples/demo-report.html\` **locally in a browser** to explore it. GitHub's source viewer is not an HTML report host.
-
-The validator verifies schema, typed references, evidence origins and coverage accounting. A **PASS is not a factual audit, a runtime test or a security guarantee**.
-
-## Standalone alpha core
+## Standalone core
 
 The packaged standalone core requires **Python 3.11+**. It can inventory a local project, create canonical Scan 1.4 JSON, compare repeated scans against a prior local state, safely reuse compatible higher-level static evidence, render a self-contained HTML report from that exact state, validate both formats, enforce deterministic privacy/redaction metadata, and produce a no-network egress preview.
 
 ```bash
 python -m pip install .
+scan doctor .
 scan . --offline
 # Change the project, then scan again. The prior .scan/state.json is used locally as the baseline.
 scan . --offline
@@ -153,6 +156,28 @@ New semantic evidence created through `SemanticStateBuilder` is marked fresh. Re
 `scan bench` runs 12 mandatory synthetic adversarial fixtures covering hidden files, escaping symlinks, prompt injection, redaction, hostile filenames, unreadable content, archives, unsupported binaries, generated/vendor files, resource boundaries and false runtime claims. Results are reported separately for **inventory completeness, state integrity, evidence correctness, privacy integrity, and safety-boundary compliance**. ScanBench deliberately does **not** calculate a blended quality score.
 
 Run one fixture with `scan bench FIXTURE`. The installed wheel carries the same canonical fixture data, so this works outside the source checkout as well.
+
+![Screenshot of the synthetic Pocket Ledger Scan report, showing coverage and explicit unknowns](assets/demo-preview.png)
+
+[Explore the synthetic fixture](examples/demo-project/README.md) · [Download the example HTML report](examples/demo-report.html) · [Read the report contract](references/report-contract.md)
+
+> **Demo disclosure:** The linked report is a hand-reviewed **synthetic worked example** generated from five fictional files. It demonstrates the Scan 1.2 format and validator, **not** a claim that an autonomous agent scanned a real repository. The example did not execute the inspected code.
+
+## Historical synthetic proof
+
+You only need **Python 3.9+** to validate the example report; the validator and its tests use the standard library.
+
+\`\`\`bash
+git clone https://github.com/legendteddy/scan.git
+cd scan
+python scripts/validate_report.py examples/demo-report.html
+python scripts/build_demo_report.py --check
+python -m unittest discover -s scripts -p "test_*.py" -v
+\`\`\`
+
+Expected: the example report passes the structural contract, the generated HTML matches the checked-in version, and the validator tests pass. Open \`examples/demo-report.html\` **locally in a browser** to explore it. GitHub's source viewer is not an HTML report host.
+
+The validator verifies schema, typed references, evidence origins and coverage accounting. A **PASS is not a factual audit, a runtime test or a security guarantee**.
 
 ## Install as an agent skill
 
