@@ -71,6 +71,8 @@ The standalone HTML report is static and useful without JavaScript. Its only scr
 
 The v0.5 SARIF exporter is deliberately narrower than the Scan report: only canonical `findings` become SARIF results. Unknowns, coverage gaps, unassessed checks and an empty finding set are not converted into alerts. File locations remain repository-relative and file-level unless stronger location evidence exists; Scan does not invent line numbers or GitHub line fingerprints. See [the v0.5 SARIF export contract](docs/v0.5-sarif-export.md).
 
+Third-party SARIF 2.1.0 can also be imported into an existing validated Scan state with `scan import-sarif BASE_STATE RESULTS.sarif --output NEW_STATE`. Only safely mapped `fail` results become static external-tool findings; review/open or unmapped results remain explicit unknowns, and imported prose is re-redacted before entering canonical state. See [the v0.5 SARIF import adapter contract](docs/v0.5-sarif-import.md).
+
 ### GitHub Action (v0.5 development)
 
 Scan now includes a reusable composite `action.yml` for CI-native inspection. It runs deterministic Core offline, writes canonical state/report/SARIF/summary receipts to a fresh directory under `RUNNER_TEMP` by default, and appends an evidence-aware GitHub job summary. It does **not** upload SARIF, upload artifacts, post PR comments, execute target code, or turn zero findings into a safety claim.

@@ -18,10 +18,12 @@ class CrossPlatformRegressionTests(unittest.TestCase):
             "scripts/github_action.py", "src/scan_core/github_ci.py",
             "src/scan_core/mcp_server.py", "src/scan_core/mcp_cli.py",
             "src/scan_core/mcp_app.py", "src/scan_core/mcp_entry.py", "src/scan_core/mcp_semantic.py",
-            "src/scan_core/sarif.py", "tests/test_sarif_export.py", "tests/test_github_action.py",
+            "src/scan_core/sarif.py", "src/scan_core/sarif_import.py", "tests/test_sarif_export.py",
+            "tests/test_sarif_import.py", "tests/test_github_action.py",
             "tests/test_mcp_server.py", "tests/test_mcp_setup.py", "tests/test_mcp_semantic.py",
             "README.md", "docs/v0.4-mcp-foundation.md", "docs/v0.4-mcp-portable-setup.md",
-            "docs/v0.4-semantic-continuation.md", "docs/v0.5-sarif-export.md", "docs/v0.5-github-action.md",
+            "docs/v0.4-semantic-continuation.md", "docs/v0.5-sarif-export.md", "docs/v0.5-sarif-import.md",
+            "docs/v0.5-github-action.md",
         ):
             with self.subTest(relative=relative):
                 self.assertFalse((root / relative).read_bytes().startswith(b"\xef\xbb\xbf"))

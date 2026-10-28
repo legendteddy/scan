@@ -439,6 +439,25 @@ class SemanticStateBuilder:
         artifact["inspected_at"] = substantive[0]["time"]
         artifact["evidence_ids"] = list(dict.fromkeys([*artifact["evidence_ids"], *evidence]))
 
+    def mark_artifact_partial(
+        self, artifact_id: str, *, evidence_ids: StringInput, reason: str = "Partial semantic analysis completed"
+    ) -> None:
+        evidence = _strings(evidence_ids, f"{artifact_id}.evidence_ids")
+        artifact = next((row for row in self.state["artifacts"] if row["id"] == artifact_id), None)
+        if artifact is None:
+            raise BuilderError(f"{artifact_id}: unknown artifact ID")
+        evidence_rows = {row["id"]: row for row in self.state["evidence"]}
+        self._refs(artifact_id, "evidence_ids", evidence, set(evidence_rows), "evidence IDs")
+        direct = [evidence_rows[ident] for ident in evidence if evidence_rows[ident]["artifact_id"] == artifact_id]
+        substantive = [row for row in direct if row["kind"] != "unverified" and row["inspection_origin"] in {"fresh", "verified_reuse"}]
+        if not substantive:
+            raise BuilderError(f"{artifact_id}.evidence_ids: partial artifacts require fresh/reused substantive evidence attached to the same artifact")
+        artifact["status"] = "partial"
+        artifact["reason"] = reason
+        artifact["inspection_origin"] = substantive[0]["inspection_origin"]
+        artifact["inspected_at"] = substantive[0]["time"]
+        artifact["evidence_ids"] = list(dict.fromkeys([*artifact["evidence_ids"], *evidence]))
+
     def remove_unknown(self, unknown_id: str) -> None:
         before = len(self.state["unknowns"])
         self.state["unknowns"] = [row for row in self.state["unknowns"] if row["id"] != unknown_id]
