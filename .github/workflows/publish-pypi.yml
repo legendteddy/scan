@@ -1,0 +1,137 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  collect-distributions:
+    name: Collect GitHub Release distributions
+    if: startsWith(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download release distributions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "$TAG_NAME" \
+            --repo "$REPOSITORY" \
+            --pattern '*.whl' \
+            --pattern '*.tar.gz' \
+            --dir dist
+
+          count="$(find dist -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) | wc -l | tr -d ' ')"
+          if [ "$count" -ne 2 ]; then
+            echo "::error::Expected exactly two Python distribution files, found $count"
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+
+          sha256sum dist/*
+
+      - name: Verify package identity and release version
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+          import tarfile
+          import zipfile
+
+          dist = pathlib.Path("dist")
+          tag = os.environ["TAG_NAME"]
+          if not re.fullmatch(r"v\d+\.\d+\.\d+", tag):
+              raise SystemExit(f"Unsupported release tag format: {tag!r}")
+
+          expected_version = tag[1:]
+          files = sorted(path for path in dist.iterdir() if path.is_file())
+          wheels = [path for path in files if path.suffix == ".whl"]
+          sdists = [path for path in files if path.name.endswith(".tar.gz")]
+          if len(wheels) != 1 or len(sdists) != 1 or len(files) != 2:
+              raise SystemExit(f"Expected one wheel and one sdist, found: {[p.name for p in files]}")
+
+          def normalize_name(value: str) -> str:
+              return re.sub(r"[-_.]+", "-", value).lower()
+
+          def metadata_fields(text: str) -> tuple[str, str]:
+              name = None
+              version = None
+              for line in text.splitlines():
+                  if line.startswith("Name: "):
+                      name = line.removeprefix("Name: ").strip()
+                  elif line.startswith("Version: "):
+                      version = line.removeprefix("Version: ").strip()
+              if not name or not version:
+                  raise SystemExit("Package metadata is missing Name or Version")
+              return name, version
+
+          wheel = wheels[0]
+          with zipfile.ZipFile(wheel) as archive:
+              metadata_members = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
+              if len(metadata_members) != 1:
+                  raise SystemExit(f"Wheel metadata count is {len(metadata_members)}, expected 1")
+              wheel_metadata = archive.read(metadata_members[0]).decode("utf-8")
+
+          sdist = sdists[0]
+          with tarfile.open(sdist, "r:gz") as archive:
+              metadata_members = [
+                  member
+                  for member in archive.getmembers()
+                  if member.isfile()
+                  and member.name.endswith("/PKG-INFO")
+                  and member.name.count("/") == 1
+              ]
+              if len(metadata_members) != 1:
+                  raise SystemExit(f"Root sdist PKG-INFO count is {len(metadata_members)}, expected 1")
+              extracted = archive.extractfile(metadata_members[0])
+              if extracted is None:
+                  raise SystemExit("Unable to read sdist PKG-INFO")
+              sdist_metadata = extracted.read().decode("utf-8")
+
+          for label, metadata in (("wheel", wheel_metadata), ("sdist", sdist_metadata)):
+              name, version = metadata_fields(metadata)
+              if normalize_name(name) != "scan-skill":
+                  raise SystemExit(f"{label} project name is {name!r}, expected 'scan-skill'")
+              if version != expected_version:
+                  raise SystemExit(f"{label} version is {version!r}, expected {expected_version!r}")
+              print(f"{label}: {name} {version}")
+          PY
+
+      - name: Stage verified distributions for publishing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pypi-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish verified distributions to PyPI
+    needs: collect-distributions
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/scan-skill
+    permissions:
+      id-token: write
+    steps:
+      - name: Retrieve verified distributions
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: pypi-distributions
+          path: dist/
+
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
