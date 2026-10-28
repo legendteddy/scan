@@ -30,7 +30,7 @@ Issues = "https://github.com/legendteddy/scan/issues"
 
 [project.scripts]
 scan = "scan_core.cli:main"
-scan-mcp = "scan_core.mcp_cli:main"
+scan-mcp = "scan_core.mcp_entry:main"
 
 [tool.setuptools]
 package-dir = {"" = "src", "scanbench_data" = "scanbench"}
