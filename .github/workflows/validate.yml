@@ -114,6 +114,30 @@ jobs:
           path: ${{ runner.temp }}/report-review
           retention-days: 14
 
+  mcp-integration:
+    name: Optional MCP bridge / Python 3.12
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build Scan wheel
+        run: python -m pip wheel --disable-pip-version-check --no-deps . --wheel-dir "$RUNNER_TEMP/wheelhouse"
+
+      - name: Install wheel with MCP extra
+        run: |
+          python -c "from pathlib import Path; import os,subprocess,sys; w=next((Path(os.environ['RUNNER_TEMP'])/'wheelhouse').glob('*.whl')); subprocess.check_call([sys.executable,'-m','pip','install','--disable-pip-version-check',str(w)+'[mcp]'])"
+
+      - name: Verify packaged MCP bridge
+        run: |
+          scan-mcp --help
+          python -B -m unittest discover -s tests -p "test_mcp_server.py" -v
+
   compatibility:
     name: Python ${{ matrix.python-version }} compatibility
     runs-on: ubuntu-latest
