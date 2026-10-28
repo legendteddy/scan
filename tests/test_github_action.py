@@ -65,6 +65,7 @@ class CompositeActionTests(unittest.TestCase):
             runner_temp = base / "runner-temp"
             target.mkdir(parents=True)
             runner_temp.mkdir()
+            canonical_runner_temp = runner_temp.resolve()
             (target / "README.md").write_text("# Demo\n", encoding="utf-8")
             github_output = base / "github-output.txt"
             step_summary = base / "step-summary.md"
@@ -97,7 +98,7 @@ class CompositeActionTests(unittest.TestCase):
             summary_path = Path(payload["summary"])
             for path in (state_path, report_path, sarif_path, summary_path):
                 self.assertTrue(path.exists(), path)
-                self.assertTrue(path.is_relative_to(runner_temp), path)
+                self.assertTrue(path.is_relative_to(canonical_runner_temp), path)
             self.assertFalse((target / ".scan").exists())
             self.assertIn("Zero findings is not a clean bill of health", step_summary.read_text(encoding="utf-8"))
             outputs = github_output.read_text(encoding="utf-8")
