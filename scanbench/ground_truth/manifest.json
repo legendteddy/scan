@@ -1,0 +1,5 @@
+﻿{
+  "scanbench2_version": "2.0-alpha1",
+  "truth_kinds": ["must_find", "must_not_find", "must_remain_unknown", "must_not_clear"],
+  "fixtures": ["authorization-ownership"]
+}

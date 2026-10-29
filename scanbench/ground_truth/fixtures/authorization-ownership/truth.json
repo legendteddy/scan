@@ -1,0 +1,10 @@
+﻿{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "authorization-ownership",
+  "conditions": [
+    {"id": "AUTH-001", "truth": "must_find", "family": "authorization", "description": "Authenticated users can delete documents they do not own because delete_document never checks owner_id against current_user.id.", "rationale": "This is a direct object-level authorization defect with destructive impact.", "artifact_locators": ["app.py"]},
+    {"id": "AUTH-002", "truth": "must_not_find", "family": "injection", "description": "The document lookup/delete SQL shown in this fixture is parameterized and is a negative SQL-injection control.", "rationale": "A scanner should not manufacture SQL injection merely because SQL strings exist.", "artifact_locators": ["app.py"]},
+    {"id": "AUTH-003", "truth": "must_remain_unknown", "family": "identity-runtime", "description": "Whether the production identity provider enforces MFA cannot be established from this repository fixture.", "rationale": "Repository source alone is not observed production identity-provider configuration.", "artifact_locators": []},
+    {"id": "AUTH-004", "truth": "must_not_clear", "family": "release-readiness", "description": "Authorization readiness must not be cleared while AUTH-001 exists or production identity controls remain unverified.", "rationale": "Absence of additional findings is not evidence that authorization is safe for release.", "artifact_locators": ["app.py"]}
+  ]
+}
