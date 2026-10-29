@@ -13,6 +13,7 @@ from .compare import compare_states
 from .config import ScanConfig
 from .core import scan_project
 from .doctor import format_doctor, run_doctor
+from .evidence_federation import import_evidence_bundle, load_evidence_bundle_file
 from .errors import (
     CommandError,
     CoverageThresholdError,
@@ -36,7 +37,7 @@ from .settings import ProjectSettings, load_project_settings
 from .validate import validate_path
 from .version import __version__
 
-UTILITY_COMMANDS = {"validate", "render", "sarif", "import-sarif", "serve", "bench", "bench2", "schema", "egress", "compare", "doctor"}
+UTILITY_COMMANDS = {"validate", "render", "sarif", "import-sarif", "import-evidence", "serve", "bench", "bench2", "schema", "egress", "compare", "doctor"}
 
 
 def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool) -> None:
@@ -88,6 +89,12 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
     elif command == "import-sarif":
         parser.add_argument("state_json", type=Path)
         parser.add_argument("sarif_json", type=Path)
+        parser.add_argument("--output", type=Path, required=True)
+        parser.add_argument("--report", type=Path)
+        parser.add_argument("--json", action="store_true")
+    elif command == "import-evidence":
+        parser.add_argument("state_json", type=Path)
+        parser.add_argument("bundle_json", type=Path)
         parser.add_argument("--output", type=Path, required=True)
         parser.add_argument("--report", type=Path)
         parser.add_argument("--json", action="store_true")
@@ -236,6 +243,28 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
             print(f"Imported evidence: {imported.imported_evidence}")
             print(f"Unmapped/review results retained as unknowns: {imported.unmapped_results}")
             print(f"Ignored non-fail results: {imported.ignored_results}")
+            print(f"State written to {args.output}")
+        return int(ExitCode.OK)
+    if command == "import-evidence":
+        for path in (args.state_json, args.bundle_json):
+            if not path.exists():
+                raise SourceError(f"Source path does not exist: {path}")
+        state = validate_path(args.state_json)
+        bundle, raw = load_evidence_bundle_file(args.bundle_json)
+        imported = import_evidence_bundle(state, bundle, source_bytes=raw)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(canonical_state_json(imported.state) + "\n", encoding="utf-8", newline="\n")
+        if args.report is not None:
+            render_report(imported.state, args.report)
+        summary = {**imported.as_dict(), "state_path": str(args.output), "report_path": str(args.report) if args.report else None}
+        if args.json:
+            print(json.dumps(summary, ensure_ascii=True, sort_keys=True, separators=(",", ":")))
+        else:
+            print(f"Imported findings: {imported.imported_findings}")
+            print(f"Imported unknowns: {imported.imported_unknowns}")
+            print(f"Imported evidence: {imported.imported_evidence}")
+            print(f"Unmapped external results retained as unknowns: {imported.unmapped_results}")
+            print(f"Ignored duplicate results: {imported.ignored_results}")
             print(f"State written to {args.output}")
         return int(ExitCode.OK)
     if command == "serve":
