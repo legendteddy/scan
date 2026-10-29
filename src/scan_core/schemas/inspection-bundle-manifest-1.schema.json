@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/legendteddy/scan/schema/inspection-bundle-manifest-1.schema.json",
+  "title": "Scan Inspection Bundle v1 manifest",
+  "type": "object",
+  "required": ["inspection_bundle_version", "identity", "members", "coverage", "summary", "contract"],
+  "properties": {
+    "inspection_bundle_version": {"const": "1"},
+    "identity": {
+      "type": "object",
+      "required": ["schema_version", "state_digest", "snapshot_digest", "scan_id", "scan_version", "scan_mode", "handoff_digest"],
+      "properties": {
+        "schema_version": {"type": "string", "minLength": 1},
+        "state_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "snapshot_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "scan_id": {"type": "string", "minLength": 1},
+        "scan_version": {"type": "string", "minLength": 1},
+        "scan_mode": {"type": "string", "minLength": 1},
+        "handoff_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "members": {
+      "type": "object",
+      "required": ["state.json", "handoff.json"],
+      "properties": {
+        "state.json": {"$ref": "#/$defs/member"},
+        "handoff.json": {"$ref": "#/$defs/member"}
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["discovery_complete", "analysis_complete", "checks_complete", "discovered_artifact_count", "counts_by_status", "counts_by_check_status"],
+      "properties": {
+        "discovery_complete": {"type": "boolean"},
+        "analysis_complete": {"type": "boolean"},
+        "checks_complete": {"type": "boolean"},
+        "discovered_artifact_count": {"type": "integer", "minimum": 0},
+        "counts_by_status": {"type": "object"},
+        "counts_by_check_status": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["readiness", "finding_count", "control_count", "unknown_count", "check_count"],
+      "properties": {
+        "readiness": {"type": "string"},
+        "finding_count": {"type": "integer", "minimum": 0},
+        "control_count": {"type": "integer", "minimum": 0},
+        "unknown_count": {"type": "integer", "minimum": 0},
+        "check_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "contract": {
+      "type": "object",
+      "required": ["authoritative_member", "handoff_is_projection", "manifest_self_digest_embedded", "may_contain_redacted_target_derived_semantic_text", "contains_executable_plugin_payloads", "no_blended_quality_score"],
+      "properties": {
+        "authoritative_member": {"const": "state.json"},
+        "handoff_is_projection": {"const": true},
+        "manifest_self_digest_embedded": {"const": false},
+        "may_contain_redacted_target_derived_semantic_text": {"const": true},
+        "contains_executable_plugin_payloads": {"const": false},
+        "no_blended_quality_score": {"const": true}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "member": {
+      "type": "object",
+      "required": ["sha256", "size_bytes", "media_type"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "media_type": {"const": "application/json"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$comment": "manifest.json intentionally cannot embed its own digest. The bundle verifier independently hashes the complete archive and validates every non-manifest member digest plus canonical state/handoff reconstruction."
+}
