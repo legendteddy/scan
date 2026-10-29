@@ -222,6 +222,36 @@ jobs:
           assert report.is_file()
           print("SARIF_IMPORT_CLI_SMOKE=PASS")
 
+      - name: Verify installed local report viewer
+        shell: python
+        run: |
+          import threading
+          from pathlib import Path
+          import subprocess
+          import tempfile
+          from urllib.request import urlopen
+          from scan_core.serve import create_server
+          root = Path(tempfile.mkdtemp())
+          project = root / "project"
+          project.mkdir()
+          (project / "app.py").write_text("print('serve')\n", encoding="utf-8")
+          state = root / "state.json"
+          subprocess.run(["scan", str(project), "--offline", "--baseline", "none", "--no-html", "--state", str(state), "--quiet"], check=True)
+          subprocess.run(["scan", "serve", "--help"], check=True, stdout=subprocess.DEVNULL)
+          server, catalog = create_server(state, port=0, quiet=True)
+          thread = threading.Thread(target=server.serve_forever, daemon=True)
+          thread.start()
+          try:
+              with urlopen(f"http://127.0.0.1:{server.server_address[1]}/", timeout=3) as response:
+                  body = response.read().decode("utf-8")
+                  assert response.status == 200 and "Scan report history" in body
+              assert len(catalog.entries) == 1
+          finally:
+              server.shutdown()
+              server.server_close()
+              thread.join(timeout=3)
+          print("LOCAL_VIEWER_SMOKE=PASS")
+
       - name: Verify reusable GitHub Action receipts
         id: scan-action
         uses: ./

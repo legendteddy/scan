@@ -29,12 +29,13 @@ from .sarif import write_sarif
 from .sarif_import import import_sarif, load_sarif_file
 from .scanbench import format_bench, run_bench
 from .schema import schema_text
+from .serve import create_server
 from .state import canonical_state_json
 from .settings import ProjectSettings, load_project_settings
 from .validate import validate_path
 from .version import __version__
 
-UTILITY_COMMANDS = {"validate", "render", "sarif", "import-sarif", "bench", "schema", "egress", "compare", "doctor"}
+UTILITY_COMMANDS = {"validate", "render", "sarif", "import-sarif", "serve", "bench", "schema", "egress", "compare", "doctor"}
 
 
 def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool) -> None:
@@ -89,6 +90,12 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
         parser.add_argument("--output", type=Path, required=True)
         parser.add_argument("--report", type=Path)
         parser.add_argument("--json", action="store_true")
+    elif command == "serve":
+        parser.add_argument("source", nargs="?", type=Path, default=Path(".scan"))
+        parser.add_argument("--host", default="127.0.0.1")
+        parser.add_argument("--port", type=int, default=8765)
+        parser.add_argument("--allow-network", action="store_true")
+        parser.add_argument("--quiet", action="store_true")
     elif command == "bench":
         parser.add_argument("fixture", nargs="?")
         parser.add_argument("--json", action="store_true")
@@ -224,6 +231,29 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
             print(f"Unmapped/review results retained as unknowns: {imported.unmapped_results}")
             print(f"Ignored non-fail results: {imported.ignored_results}")
             print(f"State written to {args.output}")
+        return int(ExitCode.OK)
+    if command == "serve":
+        if not args.source.exists():
+            raise SourceError(f"Source path does not exist: {args.source}")
+        server, catalog = create_server(
+            args.source,
+            host=args.host,
+            port=args.port,
+            allow_network=args.allow_network,
+            quiet=args.quiet,
+        )
+        actual_host, actual_port = server.server_address[:2]
+        if not args.quiet:
+            print(f"Serving {len(catalog.entries)} validated Scan receipt(s) at http://{actual_host}:{actual_port}/")
+            if catalog.skipped_count:
+                print(f"Ignored {catalog.skipped_count} invalid or duplicate JSON receipt(s)")
+            print("Read-only local viewer; project files are not served. Press Ctrl+C to stop.")
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            server.server_close()
         return int(ExitCode.OK)
     if command == "bench":
         result = run_bench(fixture=args.fixture)
