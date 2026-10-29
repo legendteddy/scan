@@ -25,6 +25,7 @@ from .errors import (
     ValidationError,
 )
 from .inventory import build_inventory
+from .observed_receipt import import_observed_receipt, load_observed_receipt_file
 from .privacy import build_egress_preview
 from .render import render_report
 from .sarif import write_sarif
@@ -38,7 +39,7 @@ from .settings import ProjectSettings, load_project_settings
 from .validate import validate_path
 from .version import __version__
 
-UTILITY_COMMANDS = {"validate", "render", "sarif", "import-sarif", "import-evidence", "handoff", "serve", "bench", "bench2", "schema", "egress", "compare", "doctor"}
+UTILITY_COMMANDS = {"validate", "render", "sarif", "import-sarif", "import-evidence", "import-observed", "handoff", "serve", "bench", "bench2", "schema", "egress", "compare", "doctor"}
 
 
 def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool) -> None:
@@ -96,6 +97,12 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
     elif command == "import-evidence":
         parser.add_argument("state_json", type=Path)
         parser.add_argument("bundle_json", type=Path)
+        parser.add_argument("--output", type=Path, required=True)
+        parser.add_argument("--report", type=Path)
+        parser.add_argument("--json", action="store_true")
+    elif command == "import-observed":
+        parser.add_argument("state_json", type=Path)
+        parser.add_argument("receipt_json", type=Path)
         parser.add_argument("--output", type=Path, required=True)
         parser.add_argument("--report", type=Path)
         parser.add_argument("--json", action="store_true")
