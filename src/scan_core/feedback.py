@@ -1,9 +1,8 @@
 """Privacy-safe post-run contribution receipts for AI agents using Scan.
 
-This module deliberately separates *recording* feedback from *submitting* it.
 Every invocation writes a bounded machine-readable receipt. External GitHub
-submission happens only when explicitly enabled by caller/host policy.
-Target-controlled project configuration is never consulted.
+submission happens only when explicitly enabled by caller/host policy. Target-
+controlled project configuration is never consulted.
 """
 from __future__ import annotations
 
@@ -229,9 +228,15 @@ def _issue_body(receipt: dict[str, Any]) -> str:
     else:
         lines.append("- No host test result supplied.")
     lines.extend(["", "### Product feedback"])
-    lines.extend(f"- {item}" for item in receipt["feedback"]) or lines.append("- None supplied.")
+    if receipt["feedback"]:
+        lines.extend(f"- {item}" for item in receipt["feedback"])
+    else:
+        lines.append("- None supplied.")
     lines.extend(["", "### Scan issues observed"])
-    lines.extend(f"- {item}" for item in receipt["issues"]) or lines.append("- None supplied.")
+    if receipt["issues"]:
+        lines.extend(f"- {item}" for item in receipt["issues"])
+    else:
+        lines.append("- None supplied.")
     lines.extend([
         "",
         "### Privacy boundary",
@@ -241,7 +246,6 @@ def _issue_body(receipt: dict[str, Any]) -> str:
 
 
 def _issue_title(receipt: dict[str, Any]) -> str:
-    candidate = None
     if receipt["issues"]:
         candidate = receipt["issues"][0]
     elif receipt["feedback"]:
@@ -250,8 +254,7 @@ def _issue_title(receipt: dict[str, Any]) -> str:
         candidate = "Scan agent test failure"
     else:
         candidate = "Scan agent usage receipt"
-    candidate = candidate[:100]
-    return f"[agent feedback] {candidate}"
+    return f"[agent feedback] {candidate[:100]}"
 
 
 def submit_github(receipt: dict[str, Any]) -> dict[str, Any]:
@@ -269,7 +272,7 @@ def submit_github(receipt: dict[str, Any]) -> dict[str, Any]:
         f"https://api.github.com/repos/{repository}/issues",
         token=token,
         method="POST",
-        payload={"title": _issue_title(receipt), "body": _issue_body(receipt), "labels": ["agent-feedback"]},
+        payload={"title": _issue_title(receipt), "body": _issue_body(receipt)},
     )
     return {"status": "submitted", "url": issue.get("html_url"), "repository": repository}
 
@@ -287,7 +290,7 @@ def record_and_maybe_submit(
             submission_error = _sanitize_text(str(exc), label="submission error")
     queued = not authorized or submission is None
     paths = write_receipt(receipt, root=root, queued=queued)
-    status = submission["status"] if submission is not None else ("queued" if queued else "recorded")
+    status = submission["status"] if submission is not None else "queued"
     return {
         "status": status,
         "receipt_id": receipt["receipt_id"],
