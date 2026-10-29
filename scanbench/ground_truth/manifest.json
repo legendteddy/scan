@@ -16,15 +16,20 @@
     "java-http-egress",
     "c-native-bounds",
     "k8s-privilege-boundary",
-    "ruby-reset-token"
+    "ruby-reset-token",
+    "sql-migration-safety",
+    "kotlin-offline-sync",
+    "terraform-destruction",
+    "react-checkout-state",
+    "csharp-message-delivery"
   ],
   "maturity_target": {
     "projects": 20,
     "conditions": 200
   },
   "milestone": {
-    "name": "corpus-m8",
-    "projects": 15,
-    "conditions": 99
+    "name": "corpus-m9",
+    "projects": 20,
+    "conditions": 149
   }
 }
