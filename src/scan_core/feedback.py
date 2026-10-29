@@ -14,7 +14,7 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 from urllib import error, parse, request
 
 from .version import __version__
@@ -24,9 +24,12 @@ DEFAULT_REPOSITORY = "legendteddy/scan"
 MAX_TEXT = 800
 MAX_ITEMS = 20
 MAX_STATE_BYTES = 64_000_000
+MAX_RECEIPT_BYTES = 128_000
+MAX_FLUSH_ITEMS = 20
 VALID_TEST_RESULTS = {"pass", "fail", "partial", "skipped", "unknown"}
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SECRET_PATTERNS = (
     re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"),
     re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b"),
@@ -95,7 +98,7 @@ def _state_binding(path: Path | None) -> dict[str, str] | None:
     return {"digest": digest, "schema_version": schema_version}
 
 
-def _fingerprint_payload(receipt: dict[str, Any]) -> str:
+def _fingerprint_payload(receipt: Mapping[str, Any]) -> str:
     stable = {
         "protocol_version": receipt["protocol_version"],
         "scan_version": receipt["scan_version"],
@@ -138,6 +141,98 @@ def build_receipt(
     receipt["fingerprint"] = _fingerprint_payload(receipt)
     receipt["receipt_id"] = "scan-feedback-" + receipt["fingerprint"][:16]
     return receipt
+
+
+def validate_receipt(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate an existing receipt before retrying any external submission."""
+    if value.get("protocol_version") != PROTOCOL_VERSION:
+        raise ValueError(f"feedback receipt protocol_version must be {PROTOCOL_VERSION}")
+    scan_version = value.get("scan_version")
+    created_at = value.get("created_at")
+    if not isinstance(scan_version, str) or not scan_version:
+        raise ValueError("feedback receipt scan_version must be nonempty text")
+    if not isinstance(created_at, str) or not created_at:
+        raise ValueError("feedback receipt created_at must be nonempty text")
+
+    agent = value.get("agent", "")
+    host = value.get("host", "")
+    if _sanitize_text(agent, label="agent") != agent or _sanitize_text(host, label="host") != host:
+        raise ValueError("feedback receipt agent/host fields are not privacy-sanitized")
+
+    tests = value.get("tests")
+    if not isinstance(tests, list) or len(tests) > MAX_ITEMS:
+        raise ValueError("feedback receipt tests must be a bounded array")
+    normalized_tests: list[dict[str, str]] = []
+    for index, row in enumerate(tests):
+        if not isinstance(row, Mapping):
+            raise ValueError(f"feedback receipt tests[{index}] must be an object")
+        name = row.get("name")
+        result = row.get("result")
+        if not isinstance(name, str) or not name or _sanitize_text(name, label="test name") != name:
+            raise ValueError(f"feedback receipt tests[{index}].name is invalid")
+        if result not in VALID_TEST_RESULTS:
+            raise ValueError(f"feedback receipt tests[{index}].result is invalid")
+        normalized_tests.append({"name": name, "result": result})
+
+    def checked_text_list(field: str) -> list[str]:
+        rows = value.get(field)
+        if not isinstance(rows, list) or len(rows) > MAX_ITEMS:
+            raise ValueError(f"feedback receipt {field} must be a bounded array")
+        normalized: list[str] = []
+        for index, item in enumerate(rows):
+            if not isinstance(item, str) or not item:
+                raise ValueError(f"feedback receipt {field}[{index}] must be nonempty text")
+            if _sanitize_text(item, label=field) != item:
+                raise ValueError(f"feedback receipt {field}[{index}] is not privacy-sanitized")
+            normalized.append(item)
+        return normalized
+
+    feedback = checked_text_list("feedback")
+    issues = checked_text_list("issues")
+
+    state = value.get("state")
+    normalized_state: dict[str, str] | None = None
+    if state is not None:
+        if not isinstance(state, Mapping):
+            raise ValueError("feedback receipt state must be an object or null")
+        digest = state.get("digest")
+        schema_version = state.get("schema_version")
+        if not isinstance(digest, str) or _SHA256_RE.fullmatch(digest) is None:
+            raise ValueError("feedback receipt state.digest must be sha256:<64 lowercase hex>")
+        if not isinstance(schema_version, str) or not schema_version:
+            raise ValueError("feedback receipt state.schema_version must be nonempty text")
+        normalized_state = {"digest": digest, "schema_version": schema_version}
+
+    privacy = value.get("privacy")
+    expected_privacy = {
+        "target_content_included": False,
+        "raw_logs_included": False,
+        "absolute_target_paths_included": False,
+    }
+    if privacy != expected_privacy:
+        raise ValueError("feedback receipt privacy boundary is invalid")
+
+    normalized: dict[str, Any] = {
+        "protocol_version": PROTOCOL_VERSION,
+        "scan_version": scan_version,
+        "created_at": created_at,
+        "agent": agent,
+        "host": host,
+        "state": normalized_state,
+        "tests": normalized_tests,
+        "feedback": feedback,
+        "issues": issues,
+        "privacy": expected_privacy,
+    }
+    fingerprint = _fingerprint_payload(normalized)
+    if value.get("fingerprint") != fingerprint:
+        raise ValueError("feedback receipt fingerprint does not match receipt payload")
+    receipt_id = "scan-feedback-" + fingerprint[:16]
+    if value.get("receipt_id") != receipt_id:
+        raise ValueError("feedback receipt_id does not match fingerprint")
+    normalized["fingerprint"] = fingerprint
+    normalized["receipt_id"] = receipt_id
+    return normalized
 
 
 def _feedback_root(explicit: Path | None = None) -> Path:
@@ -303,6 +398,117 @@ def record_and_maybe_submit(
     }
 
 
+def _load_queued_receipt(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("queued feedback receipt must be a regular non-symlink file")
+    if path.stat().st_size > MAX_RECEIPT_BYTES:
+        raise ValueError(f"queued feedback receipt exceeds {MAX_RECEIPT_BYTES} bytes")
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot parse queued feedback receipt: {exc}") from exc
+    if not isinstance(value, Mapping):
+        raise ValueError("queued feedback receipt root must be an object")
+    receipt = validate_receipt(value)
+    if path.name != receipt["receipt_id"] + ".json":
+        raise ValueError("queued feedback filename does not match receipt_id")
+    return receipt
+
+
+def flush_outbox(*, mode: str = "auto", root: Path | None = None) -> dict[str, Any]:
+    """Retry a bounded batch of queued receipts when submission is already authorized."""
+    authorized = _submission_authorized(mode)
+    base = _feedback_root(root)
+    outbox = base / "outbox"
+    if not authorized:
+        pending = len(list(outbox.glob("*.json"))) if outbox.is_dir() else 0
+        return {
+            "status": "not_authorized",
+            "submission_authorized": False,
+            "processed": 0,
+            "submitted": 0,
+            "duplicate": 0,
+            "failed": 0,
+            "invalid": 0,
+            "pending": pending,
+            "results": [],
+        }
+    if not outbox.is_dir():
+        return {
+            "status": "empty",
+            "submission_authorized": True,
+            "processed": 0,
+            "submitted": 0,
+            "duplicate": 0,
+            "failed": 0,
+            "invalid": 0,
+            "pending": 0,
+            "results": [],
+        }
+
+    candidates = sorted(outbox.glob("*.json"), key=lambda path: path.name)
+    batch = candidates[:MAX_FLUSH_ITEMS]
+    results: list[dict[str, Any]] = []
+    submitted = duplicate = failed = invalid = 0
+    for path in batch:
+        try:
+            receipt = _load_queued_receipt(path)
+        except (OSError, ValueError) as exc:
+            invalid += 1
+            results.append({
+                "file": path.name,
+                "status": "invalid",
+                "error": _sanitize_text(str(exc), label="outbox validation error"),
+            })
+            continue
+        try:
+            submission = submit_github(receipt)
+        except (RuntimeError, ValueError, OSError, error.HTTPError, error.URLError, json.JSONDecodeError) as exc:
+            failed += 1
+            results.append({
+                "file": path.name,
+                "receipt_id": receipt["receipt_id"],
+                "status": "failed",
+                "error": _sanitize_text(str(exc), label="submission error"),
+            })
+            continue
+        status = submission.get("status")
+        if status not in {"submitted", "duplicate"}:
+            failed += 1
+            results.append({
+                "file": path.name,
+                "receipt_id": receipt["receipt_id"],
+                "status": "failed",
+                "error": "submission returned an unsupported status",
+            })
+            continue
+        path.unlink()
+        if status == "submitted":
+            submitted += 1
+        else:
+            duplicate += 1
+        results.append({
+            "file": path.name,
+            "receipt_id": receipt["receipt_id"],
+            "status": status,
+            "url": submission.get("url"),
+        })
+
+    pending = len(list(outbox.glob("*.json")))
+    return {
+        "status": "complete" if pending == 0 else "partial",
+        "submission_authorized": True,
+        "processed": len(batch),
+        "submitted": submitted,
+        "duplicate": duplicate,
+        "failed": failed,
+        "invalid": invalid,
+        "pending": pending,
+        "batch_limit": MAX_FLUSH_ITEMS,
+        "results": results,
+    }
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m scan_core.feedback",
@@ -316,6 +522,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--issue", action="append", default=[])
     parser.add_argument("--submit", choices=("auto", "github", "never"), default="auto")
     parser.add_argument("--feedback-home", type=Path)
+    parser.add_argument("--flush", action="store_true", help="retry a bounded batch of validated queued receipts")
     parser.add_argument("--json", action="store_true")
     return parser
 
@@ -323,20 +530,29 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        receipt = build_receipt(
-            state_path=args.state,
-            agent=args.agent,
-            host=args.host,
-            tests=args.test,
-            feedback=args.feedback,
-            issues=args.issue,
-        )
-        result = record_and_maybe_submit(receipt, mode=args.submit, root=args.feedback_home)
+        if args.flush:
+            result = flush_outbox(mode=args.submit, root=args.feedback_home)
+        else:
+            receipt = build_receipt(
+                state_path=args.state,
+                agent=args.agent,
+                host=args.host,
+                tests=args.test,
+                feedback=args.feedback,
+                issues=args.issue,
+            )
+            result = record_and_maybe_submit(receipt, mode=args.submit, root=args.feedback_home)
     except (OSError, ValueError) as exc:
         print(f"scan feedback error: {exc}", file=sys.stderr)
         return 2
     if args.json:
         print(json.dumps(result, ensure_ascii=True, sort_keys=True, separators=(",", ":")))
+    elif args.flush:
+        print(f"Scan feedback outbox: {result['status']}")
+        print(
+            f"Submitted: {result['submitted']}  Duplicate: {result['duplicate']}  "
+            f"Failed: {result['failed']}  Invalid: {result['invalid']}  Pending: {result['pending']}"
+        )
     else:
         print(f"Scan feedback: {result['status']}")
         print(f"Receipt: {result['receipt_path']}")
