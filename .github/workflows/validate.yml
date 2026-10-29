@@ -241,21 +241,25 @@ jobs:
         run: |
           import hashlib
           import json
+          import os
           from pathlib import Path
           import subprocess
+          import sysconfig
           import tempfile
           root = Path(tempfile.mkdtemp())
+          scan_cmd = str(Path(sysconfig.get_path("scripts")) / ("scan.exe" if os.name == "nt" else "scan"))
+          assert Path(scan_cmd).is_file(), scan_cmd
           project = root / "project"
           project.mkdir()
           (project / "app.py").write_text("def value():\n    return 1\n", encoding="utf-8")
           state_path = root / "state.json"
-          subprocess.run(["scan", str(project), "--offline", "--baseline", "none", "--no-html", "--state", str(state_path), "--quiet"], check=True)
+          subprocess.run([scan_cmd, str(project), "--offline", "--baseline", "none", "--no-html", "--state", str(state_path), "--quiet"], check=True)
           state = json.loads(state_path.read_text(encoding="utf-8"))
           artifact = next(row for row in state["artifacts"] if row.get("locator") == "app.py")
           snapshot = state["provenance"]["snapshot_digest"]
 
           handoff_path = root / "handoff.json"
-          handoff = json.loads(subprocess.check_output(["scan", "handoff", str(state_path), "--output", str(handoff_path), "--json"], text=True))
+          handoff = json.loads(subprocess.check_output([scan_cmd, "handoff", str(state_path), "--output", str(handoff_path), "--json"], text=True))
           assert handoff["identity"]["snapshot_digest"] == snapshot
           assert handoff["projection"]["contains_source_bytes"] is False
           assert handoff["projection"]["contains_raw_evidence_results"] is False
@@ -280,7 +284,7 @@ jobs:
           bundle_path = root / "evidence.json"
           bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
           federated_state_path = root / "federated-state.json"
-          federated = json.loads(subprocess.check_output(["scan", "import-evidence", str(state_path), str(bundle_path), "--output", str(federated_state_path), "--json"], text=True))
+          federated = json.loads(subprocess.check_output([scan_cmd, "import-evidence", str(state_path), str(bundle_path), "--output", str(federated_state_path), "--json"], text=True))
           assert federated["imported_findings"] == 1
           assert federated["imported_evidence"] == 1
           federated_state = json.loads(federated_state_path.read_text(encoding="utf-8"))
@@ -310,7 +314,7 @@ jobs:
           receipt_path = root / "observed.json"
           receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
           observed_state_path = root / "observed-state.json"
-          observed = json.loads(subprocess.check_output(["scan", "import-observed", str(state_path), str(receipt_path), "--output", str(observed_state_path), "--json"], text=True))
+          observed = json.loads(subprocess.check_output([scan_cmd, "import-observed", str(state_path), str(receipt_path), "--output", str(observed_state_path), "--json"], text=True))
           assert observed["imported_controls"] == 1
           assert observed["imported_evidence"] == 1
           observed_state = json.loads(observed_state_path.read_text(encoding="utf-8"))
