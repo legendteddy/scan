@@ -121,6 +121,54 @@ class ScanBench2CorpusTests(unittest.TestCase):
             with self.assertRaisesRegex(CommandError, "duplicate corpus condition ID"):
                 summarize_corpus(root)
 
+    def test_fixture_names_cannot_escape_fixture_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for fixture_name in ("../escape", "nested/name", "..\\escape", "C:drive"):
+                with self.subTest(fixture_name=fixture_name):
+                    (root / "manifest.json").write_text(json.dumps({
+                        "scanbench2_version": "2.0-alpha1",
+                        "truth_kinds": ["must_find", "must_not_find", "must_remain_unknown", "must_not_clear"],
+                        "fixtures": [fixture_name],
+                        "maturity_target": {"projects": 20, "conditions": 200},
+                    }), encoding="utf-8")
+                    with self.assertRaisesRegex(CommandError, "canonical single-component identifier"):
+                        summarize_corpus(root)
+
+    def test_symlinked_fixture_artifact_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = root / "fixtures" / "linked"
+            project = fixture / "project"
+            project.mkdir(parents=True)
+            outside = root / "outside.py"
+            outside.write_text("secret = True\n", encoding="utf-8")
+            link = project / "app.py"
+            try:
+                link.symlink_to(outside)
+            except OSError as error:
+                self.skipTest(f"symlink creation unavailable on this platform: {error}")
+            (root / "manifest.json").write_text(json.dumps({
+                "scanbench2_version": "2.0-alpha1",
+                "truth_kinds": ["must_find", "must_not_find", "must_remain_unknown", "must_not_clear"],
+                "fixtures": ["linked"],
+                "maturity_target": {"projects": 20, "conditions": 200},
+            }), encoding="utf-8")
+            (fixture / "truth.json").write_text(json.dumps({
+                "scanbench2_version": "2.0-alpha1",
+                "project_id": "linked",
+                "conditions": [{
+                    "id": "LINK-001",
+                    "truth": "must_find",
+                    "family": "fixture-integrity",
+                    "description": "Evidence must stay inside the fixture project.",
+                    "rationale": "A symlink must not import bytes from outside the declared project tree.",
+                    "artifact_locators": ["app.py"],
+                }],
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(CommandError, "must not contain symlinks"):
+                summarize_corpus(root)
+
 
 if __name__ == "__main__":
     unittest.main()

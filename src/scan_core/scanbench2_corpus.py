@@ -5,15 +5,19 @@ import argparse
 from collections import Counter
 import json
 from pathlib import Path, PurePosixPath
+import re
 from typing import Any, Sequence
 
 from .errors import CommandError
 from .scanbench2 import GROUND_TRUTH_VERSION, TRUTH_KINDS, load_ground_truth_file
 
 _MAX_MANIFEST_BYTES = 1_000_000
+_FIXTURE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
+    if path.is_symlink():
+        raise CommandError(f"ScanBench 2.0 corpus manifest must not be a symlink: {path}")
     try:
         size = path.stat().st_size
     except OSError as error:
@@ -35,14 +39,47 @@ def _positive_int(value: Any, label: str) -> int:
     return value
 
 
+def _fixture_name(value: Any, *, index: int) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise CommandError("corpus fixture names must be nonempty strings")
+    if _FIXTURE_NAME_RE.fullmatch(value) is None:
+        raise CommandError(
+            f"corpus fixture name at index {index} must be a canonical single-component identifier: {value!r}"
+        )
+    return value
+
+
 def _artifact_path(project_root: Path, locator: str, *, condition_id: str) -> Path:
     path = PurePosixPath(locator)
-    if path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts):
+    if (
+        path.is_absolute()
+        or not path.parts
+        or "\\" in locator
+        or ":" in locator
+        or any(part in {"", ".", ".."} for part in path.parts)
+    ):
         raise CommandError(f"{condition_id}: artifact locator must be a canonical relative path: {locator!r}")
-    candidate = project_root.joinpath(*path.parts)
+    candidate = project_root
+    for part in path.parts:
+        candidate = candidate / part
+        if candidate.is_symlink():
+            raise CommandError(f"{condition_id}: artifact locator must not traverse a symlink: {locator!r}")
     if not candidate.is_file():
         raise CommandError(f"{condition_id}: artifact locator does not resolve to a fixture file: {locator!r}")
     return candidate
+
+
+def _reject_fixture_symlinks(fixture_name: str, fixture_root: Path, project_root: Path, truth_path: Path) -> None:
+    if fixture_root.is_symlink():
+        raise CommandError(f"fixture root must not be a symlink: {fixture_name}")
+    if project_root.is_symlink():
+        raise CommandError(f"fixture project directory must not be a symlink: {fixture_name}")
+    if truth_path.is_symlink():
+        raise CommandError(f"fixture truth.json must not be a symlink: {fixture_name}")
+    for path in project_root.rglob("*"):
+        if path.is_symlink():
+            relative = path.relative_to(project_root).as_posix()
+            raise CommandError(f"fixture project must not contain symlinks: {fixture_name}/{relative}")
 
 
 def summarize_corpus(root: Path) -> dict[str, Any]:
@@ -53,11 +90,10 @@ def summarize_corpus(root: Path) -> dict[str, Any]:
     if manifest.get("truth_kinds") != list(TRUTH_KINDS):
         raise CommandError("corpus truth_kinds must exactly match the evaluator truth classes")
 
-    fixtures = manifest.get("fixtures")
-    if not isinstance(fixtures, list) or not fixtures:
+    raw_fixtures = manifest.get("fixtures")
+    if not isinstance(raw_fixtures, list) or not raw_fixtures:
         raise CommandError("corpus fixtures must be a nonempty array")
-    if not all(isinstance(item, str) and item.strip() for item in fixtures):
-        raise CommandError("corpus fixture names must be nonempty strings")
+    fixtures = [_fixture_name(item, index=index) for index, item in enumerate(raw_fixtures)]
     if len(fixtures) != len(set(fixtures)):
         raise CommandError("corpus fixture names must be unique")
 
@@ -75,9 +111,11 @@ def summarize_corpus(root: Path) -> dict[str, Any]:
     for fixture_name in fixtures:
         fixture_root = root / "fixtures" / fixture_name
         project_root = fixture_root / "project"
+        truth_path = fixture_root / "truth.json"
+        _reject_fixture_symlinks(fixture_name, fixture_root, project_root, truth_path)
         if not project_root.is_dir():
             raise CommandError(f"fixture project directory is missing: {fixture_name}")
-        truth = load_ground_truth_file(fixture_root / "truth.json")
+        truth = load_ground_truth_file(truth_path)
         if truth["project_id"] != fixture_name:
             raise CommandError(
                 f"fixture {fixture_name} has mismatched project_id {truth['project_id']!r}"
