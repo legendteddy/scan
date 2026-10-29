@@ -1,6 +1,8 @@
 """Deterministic bounded inspection handoff tests."""
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -8,8 +10,9 @@ import unittest
 from unittest.mock import patch
 
 from scan_core import ScanConfig, SemanticStateBuilder, scan_project
+from scan_core.cli import main as cli_main
 from scan_core.handoff import build_handoff, canonical_handoff_json
-from scan_core.state import state_digest
+from scan_core.state import canonical_state_json, state_digest
 
 
 class InspectionHandoffTests(unittest.TestCase):
@@ -113,6 +116,24 @@ class InspectionHandoffTests(unittest.TestCase):
             build_handoff(state, ref_limit=101)
         with self.assertRaisesRegex(ValueError, 'text_limit'):
             build_handoff(state, text_limit=4001)
+
+    def test_cli_handoff_executes_and_writes_exact_projection(self):
+        state, _, _, _ = self._state()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_path = root / 'state.json'
+            output_path = root / 'handoff.json'
+            state_path.write_text(canonical_state_json(state) + '\n', encoding='utf-8', newline='\n')
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                code = cli_main(['handoff', str(state_path), '--output', str(output_path), '--json'])
+            self.assertEqual(code, 0)
+            printed = json.loads(stdout.getvalue())
+            written = json.loads(output_path.read_text(encoding='utf-8'))
+            self.assertEqual(printed, written)
+            self.assertEqual(written['identity']['state_digest'], state_digest(state))
+            self.assertFalse(written['projection']['contains_source_bytes'])
+            self.assertFalse(written['projection']['contains_raw_evidence_results'])
 
 
 if __name__ == '__main__':
