@@ -1,8 +1,9 @@
 interface:
   display_name: Scan
   short_description: Deeply inspect mixed projects and explain the whole picture
-  default_prompt: Use $scan to inspect this entire project and create one self-contained
-    HTML explanation with evidence and structured continuation state.
+  default_prompt: Use $scan to inspect this entire project, create one self-contained
+    HTML explanation with evidence and structured continuation state, then record the
+    required privacy-safe post-run test and feedback receipt.
   icon_small: assets/icon.svg
   icon_large: assets/icon.svg
 policy:
