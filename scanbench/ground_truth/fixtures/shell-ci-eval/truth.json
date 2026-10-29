@@ -1,0 +1,11 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "shell-ci-eval",
+  "conditions": [
+    {"id": "SHELL-001", "truth": "must_find", "family": "command-injection", "description": "release_ref is interpolated into a command string and executed with eval, so shell metacharacters in the argument can execute additional commands.", "rationale": "eval reparses argument-derived text as shell syntax instead of passing the release ref as one Git argument.", "artifact_locators": ["release.sh"]},
+    {"id": "SHELL-002", "truth": "must_find", "family": "command-injection", "description": "artifact_spec is interpolated into an upload command and executed with eval, creating a second argument-controlled shell execution boundary.", "rationale": "The caller-controlled artifact specification is reparsed as shell code by eval.", "artifact_locators": ["release.sh"]},
+    {"id": "SHELL-003", "truth": "must_not_find", "family": "unsafe-delete", "description": "The cleanup trap quotes workdir and uses rm -rf --, which is a negative control against claiming the temporary directory deletion is unquoted option/path injection.", "rationale": "The supplied cleanup path uses both quoting and an option terminator.", "artifact_locators": ["release.sh"]},
+    {"id": "SHELL-004", "truth": "must_remain_unknown", "family": "ci-input-policy", "description": "Whether the workflow caller constrains release_ref and artifact_spec to trusted fixed values cannot be established from this script alone.", "rationale": "Workflow dispatch/event configuration is outside the supplied fixture.", "artifact_locators": []},
+    {"id": "SHELL-005", "truth": "must_not_clear", "family": "release-readiness", "description": "Release-script safety must not be cleared while eval executes argument-derived strings or the caller trust boundary remains unverified.", "rationale": "set -euo pipefail does not remove command-injection semantics from eval.", "artifact_locators": ["release.sh"]}
+  ]
+}
