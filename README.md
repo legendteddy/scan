@@ -29,7 +29,7 @@ scan . --offline
 
 The second run uses the previous local `.scan/state.json` as its baseline and reports what was added, changed, removed or unchanged, while keeping fresh and reused evidence separate. `scan doctor .` is an offline, non-destructive readiness diagnostic: it checks installed package assets, target access and optional Git support, and uses a temporary local output probe that it removes before returning. It does not install, repair or contact anything.
 
-Scan 0.5.0 is the latest published stable release on PyPI. Install the packaged CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`. Pin `scan-skill==0.5.0` when you need that exact release. The `main` branch is the v0.6 development line and reports `0.6.0.dev0` until a release candidate is prepared.
+Scan 0.5.0 is the latest published stable release on PyPI. Install the packaged CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`. Pin `scan-skill==0.5.0` when you need that exact published release. The repository is preparing the `0.6.0` release candidate; package metadata reports `0.6.0`, but v0.6 is not a published release until the `v0.6.0` tag, GitHub Release, and PyPI publication are explicitly completed.
 
 ## What makes Scan different?
 
