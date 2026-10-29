@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "ruby-reset-token",
+  "conditions": [
+    {"id":"RUBY-001","truth":"must_find","family":"token-authenticity","description":"issue creates reset tokens by Base64-encoding user ID and expiry with no signature or secret.","rationale":"A client can forge a token for another user by encoding a chosen user ID and timestamp.","artifact_locators":["app/reset_tokens.rb"]},
+    {"id":"RUBY-002","truth":"must_find","family":"expiry-forgery","description":"consume trusts the expiry timestamp embedded in the unsigned client token.","rationale":"Because the token is unauthenticated, a forged far-future expiry can bypass intended lifetime limits.","artifact_locators":["app/reset_tokens.rb"]},
+    {"id":"RUBY-003","truth":"must_find","family":"single-use","description":"The unsafe token path has no persistence or revocation state and therefore does not enforce single use.","rationale":"A captured reset token can be replayed until its embedded expiry.","artifact_locators":["app/reset_tokens.rb"]},
+    {"id":"RUBY-004","truth":"must_find","family":"identifier-disclosure","description":"The unsafe reset token directly encodes the account identifier in reversible Base64.","rationale":"The token exposes internal user IDs and makes targeted forgery straightforward.","artifact_locators":["app/reset_tokens.rb"]},
+    {"id":"RUBY-005","truth":"must_not_find","family":"negative-control","description":"issue_safe generates a cryptographically random 32-byte-equivalent hex token and stores only its SHA-256 digest.","rationale":"This is an explicit unpredictability/storage negative control and should not be reported as deterministic token generation.","artifact_locators":["app/reset_tokens.rb"]},
+    {"id":"RUBY-006","truth":"must_not_find","family":"negative-control","description":"consume_safe uses a consume-once store record and enforces the server-side expiry.","rationale":"The safe control explicitly implements single-use and server-controlled lifetime semantics.","artifact_locators":["app/reset_tokens.rb"]},
+    {"id":"RUBY-007","truth":"must_remain_unknown","family":"transport-security","description":"Whether reset links are transported only over authenticated TLS channels is not established by this module.","rationale":"Transport security is an external deployment/property not shown in the fixture.","artifact_locators":["app/reset_tokens.rb"]},
+    {"id":"RUBY-008","truth":"must_remain_unknown","family":"account-recovery-policy","description":"Whether additional identity verification or rate limiting protects the surrounding reset flow is not established.","rationale":"The fixture contains token helpers but not the full account-recovery workflow.","artifact_locators":["app/reset_tokens.rb"]},
+    {"id":"RUBY-009","truth":"must_not_clear","family":"reset-authenticity","description":"The unsafe reset-token flow must not be cleared as tamper-resistant.","rationale":"The account ID and expiry are unauthenticated client-controlled data.","artifact_locators":["app/reset_tokens.rb"]},
+    {"id":"RUBY-010","truth":"must_not_clear","family":"replay-resistance","description":"The unsafe reset-token flow must not be cleared as single-use or replay-resistant.","rationale":"No server-side consumption state exists in issue/consume.","artifact_locators":["app/reset_tokens.rb"]}
+  ]
+}

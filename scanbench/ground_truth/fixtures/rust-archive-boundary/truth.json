@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "rust-archive-boundary",
+  "conditions": [
+    {"id":"RUST-001","truth":"must_find","family":"path-traversal","description":"The unsafe extractor joins an archive entry name directly to the destination without rejecting parent traversal components.","rationale":"Entries containing ../ can escape the intended extraction root.","artifact_locators":["src/archive.rs"]},
+    {"id":"RUST-002","truth":"must_find","family":"absolute-path-write","description":"The unsafe extractor does not reject absolute archive entry paths before joining them to the extraction root.","rationale":"Absolute paths can bypass the intended destination boundary.","artifact_locators":["src/archive.rs"]},
+    {"id":"RUST-003","truth":"must_find","family":"unsafe-overwrite","description":"The unsafe extractor uses File::create for attacker-selected targets and can overwrite an existing file reached through an unsafe path.","rationale":"Path escape combined with truncating creation can destroy files outside the archive destination.","artifact_locators":["src/archive.rs"]},
+    {"id":"RUST-004","truth":"must_find","family":"resource-bounds","description":"The unsafe extractor copies an unbounded input stream to disk with no per-entry size ceiling.","rationale":"A large or decompression-expanded entry can exhaust storage resources.","artifact_locators":["src/archive.rs"]},
+    {"id":"RUST-005","truth":"must_not_find","family":"negative-control","description":"The safe-name extractor rejects absolute paths and any component that is not a normal path component.","rationale":"This is an explicit path-normalization negative control and should not be reported as traversal-prone.","artifact_locators":["src/archive.rs"]},
+    {"id":"RUST-006","truth":"must_not_find","family":"negative-control","description":"The safe-name extractor uses create_new(true), preventing silent overwrite of an existing target.","rationale":"The safe control should not be promoted to an overwrite finding.","artifact_locators":["src/archive.rs"]},
+    {"id":"RUST-007","truth":"must_remain_unknown","family":"environment-boundary","description":"Whether the production extractor runs inside an OS sandbox, container, or chroot is not established by this source file.","rationale":"Filesystem confinement is an external runtime property absent from the fixture.","artifact_locators":["src/archive.rs"]},
+    {"id":"RUST-008","truth":"must_remain_unknown","family":"caller-contract","description":"Whether all callers pre-validate archive names before invoking extract_entry is not established by the available artifact.","rationale":"No complete call graph or caller contract is present.","artifact_locators":["src/archive.rs"]},
+    {"id":"RUST-009","truth":"must_not_clear","family":"path-confinement","description":"The unsafe extractor must not be cleared as confined to its destination directory.","rationale":"Static source shows no boundary check in extract_entry.","artifact_locators":["src/archive.rs"]},
+    {"id":"RUST-010","truth":"must_not_clear","family":"resource-confinement","description":"The unsafe extractor must not be cleared as resource-bounded for entry writes.","rationale":"No byte ceiling is enforced in extract_entry.","artifact_locators":["src/archive.rs"]}
+  ]
+}
