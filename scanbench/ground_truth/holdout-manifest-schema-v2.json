@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/legendteddy/scan/scanbench/holdout-manifest-2.0-alpha1.schema.json",
+  "title": "ScanBench 2.0 external holdout precommitment",
+  "type": "object",
+  "required": ["scanbench2_version", "holdout_manifest_version", "set_id", "custodian", "entries"],
+  "properties": {
+    "scanbench2_version": {"const": "2.0-alpha1"},
+    "holdout_manifest_version": {"const": "2.0-alpha1"},
+    "set_id": {"type": "string", "minLength": 1},
+    "custodian": {"type": "string", "minLength": 1},
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["project_id", "fixture_digest", "condition_count", "truth_kind_counts"],
+        "properties": {
+          "project_id": {"type": "string", "minLength": 1},
+          "fixture_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "condition_count": {"type": "integer", "minimum": 1},
+          "truth_kind_counts": {
+            "type": "object",
+            "required": ["must_find", "must_not_find", "must_remain_unknown", "must_not_clear"],
+            "properties": {
+              "must_find": {"type": "integer", "minimum": 0},
+              "must_not_find": {"type": "integer", "minimum": 0},
+              "must_remain_unknown": {"type": "integer", "minimum": 0},
+              "must_not_clear": {"type": "integer", "minimum": 0}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
