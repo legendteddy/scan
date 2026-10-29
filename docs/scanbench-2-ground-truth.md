@@ -56,6 +56,16 @@ Store completed receipts as `PROJECT_ID.json` files in a separate receipts direc
 
 Coverage reports approved projects and conditions separately from `changes_requested`, invalid/stale, and missing receipts. A receipt whose fixture digest no longer matches is counted as invalid, not reviewed. The tool also reports orphan receipt files and whether the independently approved project/condition counts satisfy the corpus numeric target. It does not claim holdout quality or inspector effectiveness, and it never produces a blended quality score.
 
+## Mutation and oracle consistency
+
+Semantics-preserving variants can test whether benchmark behavior depends on incidental source or oracle identifiers. Verify a declared variant with:
+
+`python -m scan_core.scanbench2_oracle_consistency ORIGINAL_FIXTURE VARIANT_FIXTURE CONSISTENCY.json --json`
+
+The consistency manifest binds both fixtures to exact fixture and project-source SHA-256 digests, declares a transformation ID, maps every original condition bijectively to every variant condition, and optionally maps renamed artifact paths. The verifier requires the **project source bytes** to change; changing only `truth.json`, project IDs, or condition IDs is not enough. Under a `semantics-preserving` claim, mapped conditions must retain the same truth class, family, description, rationale, and artifact relationship after path mapping.
+
+This supports randomized condition IDs and equivalent source transformations without allowing oracle drift to pass silently. A successful consistency check proves byte change plus oracle invariance under the declared mapping; it does not independently prove that the transformation preserves runtime semantics. That semantic-equivalence claim still needs reviewer or transformation-method evidence.
+
 ## External holdout precommitments
 
 A real holdout should not be checked into the public repository before evaluation. Instead, a custodian can publish or otherwise timestamp a small precommitment manifest containing only:
