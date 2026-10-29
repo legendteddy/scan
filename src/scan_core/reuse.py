@@ -166,7 +166,7 @@ def reused_evidence_record(
 
     allowed_fields = (
         "id", "artifact_id", "locator", "kind", "claim", "result", "method", "time",
-        "limitations", "inspection_origin", "producer", "source_digest", "evidence_class",
+        "limitations", "inspection_origin", "producer", "source_digest", "artifact_content_digest", "evidence_class",
         "check_id", "check_definition_digest", "verification_depth", "status",
     )
     row = {key: previous_evidence[key] for key in allowed_fields if key in previous_evidence}

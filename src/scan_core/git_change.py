@@ -154,6 +154,74 @@ def _parse_name_status(data: bytes, sensitive_patterns: Iterable[str]) -> dict[s
     return rows
 
 
+def _unstaged_tracked_changes(
+    root: Path,
+    executable: str,
+    sensitive_patterns: Iterable[str],
+) -> tuple[set[str], set[str]]:
+    """Detect unstaged tracked changes without asking Git to convert worktree content.
+
+    ``git diff <tree>`` may feed worktree bytes through repository-configured
+    clean/process filters. Instead, read the index's cached stat metadata and
+    compare it with ``lstat``. A stat mismatch is deliberately conservative:
+    touched-but-unchanged files may be reported as modified, while no target
+    helper is executed merely to prove byte equality.
+    """
+    data = _run_git(root, executable, ["ls-files", "--debug", "-z", "--", "."])
+    position = 0
+    modified: set[str] = set()
+    deleted: set[str] = set()
+    while position < len(data):
+        nul = data.find(b"\0", position)
+        if nul < 0:
+            raise CommandError("Git changed scope returned malformed index debug output")
+        raw_path = data[position:nul]
+        position = nul + 1
+        if not raw_path:
+            continue
+
+        mtime_ns: int | None = None
+        cached_size: int | None = None
+        for _ in range(5):
+            newline = data.find(b"\n", position)
+            if newline < 0:
+                line = data[position:]
+                position = len(data)
+            else:
+                line = data[position:newline]
+                position = newline + 1
+            text = line.decode("utf-8", errors="replace").strip()
+            if text.startswith("mtime:"):
+                try:
+                    seconds, nanoseconds = text.removeprefix("mtime:").strip().split(":", 1)
+                    mtime_ns = int(seconds) * 1_000_000_000 + int(nanoseconds)
+                except ValueError as error:
+                    raise CommandError("Git changed scope returned malformed index mtime") from error
+            elif text.startswith("size:"):
+                try:
+                    cached_size = int(text.removeprefix("size:").split("\t", 1)[0].strip())
+                except ValueError as error:
+                    raise CommandError("Git changed scope returned malformed index size") from error
+
+        if mtime_ns is None or cached_size is None:
+            raise CommandError("Git changed scope index metadata is incomplete")
+
+        path = raw_path.decode("utf-8", errors="surrogateescape")
+        safe_path = _safe_path(path, sensitive_patterns)
+        worktree_path = root.joinpath(*path.split("/"))
+        try:
+            stat = os.lstat(worktree_path)
+        except FileNotFoundError:
+            deleted.add(safe_path)
+            continue
+        except OSError:
+            modified.add(safe_path)
+            continue
+        if stat.st_mtime_ns != mtime_ns or stat.st_size != cached_size:
+            modified.add(safe_path)
+    return modified, deleted
+
+
 def inspect_git_change_scope(
     root: str | Path,
     base_ref: str,
@@ -186,14 +254,30 @@ def inspect_git_change_scope(
     if not _HEX_COMMIT.fullmatch(head_commit):
         raise CommandError("Git changed scope could not resolve HEAD to a valid commit ID")
 
-    # Compare the local base ref to the current working tree, so committed,
-    # staged and unstaged tracked changes are all represented. --relative and
-    # the explicit '.' pathspec keep results inside the declared scan root.
+    # Compare the base commit only to the Git index. This captures committed and
+    # staged changes without asking Git to convert worktree content through
+    # repository-configured clean/process filters.
     diff = _run_git(root_path, executable, [
-        "diff", "--relative", "--name-status", "-z", "--no-ext-diff", "--no-textconv",
+        "diff", "--cached", "--relative", "--name-status", "-z", "--no-ext-diff", "--no-textconv",
         "--find-renames", "--find-copies-harder", base_commit.lower(), "--", ".",
     ])
     parsed = _parse_name_status(diff, sensitive_patterns)
+
+    unstaged_modified, unstaged_deleted = _unstaged_tracked_changes(
+        root_path, executable, sensitive_patterns,
+    )
+    added = set(parsed["added"])
+    deleted = set(parsed["deleted"])
+    rename_targets = {row["to"] for row in parsed["renamed"] if row.get("to")}
+    copy_targets = {row["to"] for row in parsed["copied"] if row.get("to")}
+    modified = set(parsed["modified"])
+    modified.update(
+        path for path in unstaged_modified
+        if path not in added and path not in deleted and path not in rename_targets and path not in copy_targets
+    )
+    deleted.update(path for path in unstaged_deleted if path not in added)
+    parsed["modified"] = sorted(modified - deleted)
+    parsed["deleted"] = sorted(deleted)
 
     untracked_raw = _run_git(root_path, executable, [
         "ls-files", "--others", "--exclude-standard", "-z", "--", ".",
@@ -216,7 +300,9 @@ def inspect_git_change_scope(
         untracked=tuple(untracked),
         limitations=(
             "Git change scope is advisory source-control context and does not replace Scan filesystem inventory",
-            "Tracked categories compare base_ref to the current local working tree, including committed, staged and unstaged changes",
+            "Tracked categories combine a base-to-index comparison with conservative index-stat detection of unstaged worktree changes",
+            "Unstaged stat detection may over-report touched-but-unchanged files and cannot guarantee detection of metadata-preserving edits",
+            "Unstaged rename/copy inference is not performed; such changes may appear as deletion plus untracked content",
             "Ignored files are not enumerated by Git change scope and remain governed by Scan inventory/configuration",
             "Rename/copy detection does not alter Scan path-derived artifact identity or baseline delta categories",
             "priority_paths only consolidates current changed paths for semantic ordering; it is not a dependency, import or call graph",

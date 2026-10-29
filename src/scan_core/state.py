@@ -65,6 +65,7 @@ def configuration_digest(config: ScanConfig) -> str:
         "reuse_enabled": config.reuse_enabled,
         "max_baseline_state_bytes": config.max_baseline_state_bytes,
         "changed_since": config.changed_since,
+        "project_config_source": config.project_config_source,
     }
     if config.git_metadata_roots:
         payload["git_metadata_roots"] = sorted(str(Path(root).absolute()) for root in config.git_metadata_roots)
@@ -456,7 +457,24 @@ def build_state(
                 "mode_exclusions": [_safe_config_path(pattern, config) for pattern in inventory.mode_omissions],
                 "deeper_mode": "deep" if config.scan_mode == "quick" else ("forensic" if config.scan_mode == "deep" else None),
             },
-            "critical_artifact_selection": "Not determined by deterministic inventory; semantic selection is required",
+            "configuration_policy": {
+                "project_config_source": config.project_config_source,
+                "precedence": "caller options > project config when enabled > built-in defaults",
+                "effective": {
+                    "privacy_mode": config.privacy_mode,
+                    "redaction_level": config.redaction_level,
+                    "scan_mode": config.scan_mode,
+                    "excludes": [_safe_config_path(pattern, config) for pattern in config.excludes],
+                    "sensitive_path_pattern_count": len(config.sensitive_paths),
+                    "max_file_bytes": config.max_file_bytes,
+                    "max_total_bytes": config.max_total_bytes,
+                    "follow_internal_links": config.follow_internal_links,
+                    "baseline_mode": config.baseline_mode,
+                    "reuse_enabled": config.reuse_enabled,
+                    "max_baseline_state_bytes": config.max_baseline_state_bytes,
+                },
+            },
+             "critical_artifact_selection": "Not determined by deterministic inventory; semantic selection is required",
             "privacy_execution": "Deterministic privacy assessment completed; raw matched sensitive values are not stored in canonical state",
             "privacy_egress_preview": {
                 "files_selected": privacy.files_selected if privacy is not None else 0,

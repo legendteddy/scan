@@ -31,7 +31,7 @@ from .scanbench import format_bench, run_bench
 from .schema import schema_text
 from .serve import create_server
 from .state import canonical_state_json
-from .settings import load_project_settings
+from .settings import ProjectSettings, load_project_settings
 from .validate import validate_path
 from .version import __version__
 
@@ -50,6 +50,10 @@ def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool)
     parser.add_argument("--max-total-bytes", type=int, default=None)
     parser.add_argument("--git-metadata-root", action="append", type=Path, default=[], help="Authorize one exact external Git metadata directory for bounded provenance reads")
     parser.add_argument("--follow-internal-links", action="store_true", default=None)
+    parser.add_argument(
+        "--ignore-project-config", action="store_true",
+        help="Ignore target-controlled .scan/config.toml and use only caller options plus built-in defaults",
+    )
 
 
 def _primary_parser() -> argparse.ArgumentParser:
@@ -118,7 +122,16 @@ def _resolved_config(
     output_state: Path | None = None,
     output_html: Path | None = None,
 ) -> ScanConfig:
-    settings = load_project_settings(root)
+    ignore_project_config = bool(getattr(args, "ignore_project_config", False))
+    project_config_path = root / ".scan" / "config.toml"
+    if ignore_project_config:
+        settings = ProjectSettings()
+        project_config_source = "ignored"
+    else:
+        settings = load_project_settings(root)
+        project_config_source = (
+            "project" if project_config_path.exists() or project_config_path.is_symlink() else "built_in"
+        )
     explicit_privacy = getattr(args, "privacy", None)
     offline = bool(getattr(args, "offline", False))
     if offline and explicit_privacy not in (None, "offline"):
@@ -175,6 +188,7 @@ def _resolved_config(
         max_baseline_state_bytes=settings.max_baseline_state_bytes,
         changed_since=getattr(args, "changed_since", None),
         git_metadata_roots=tuple(getattr(args, "git_metadata_root", ())),
+        project_config_source=project_config_source,
     )
 
 

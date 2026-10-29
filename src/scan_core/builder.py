@@ -87,6 +87,7 @@ class EvidenceRecord:
     inspection_origin: str
     producer: dict[str, str]
     source_digest: str
+    artifact_content_digest: str | None
 
 
 @dataclass(frozen=True)
@@ -176,6 +177,11 @@ class SemanticStateBuilder:
             validate_state(self.state)
         except ValidationError as error:
             raise BuilderError(f"base_state: {error}") from error
+        self.state.setdefault("extensions", {}).setdefault("evidence_binding", {
+            "version": "1",
+            "artifact_digest_field": "artifact_content_digest",
+            "locator_rule": "evidence locator must equal or be anchored to the referenced artifact locator",
+        })
 
     @classmethod
     def from_state(cls, state: Mapping[str, Any]) -> "SemanticStateBuilder":
@@ -188,6 +194,18 @@ class SemanticStateBuilder:
         for ref in refs:
             if ref not in allowed:
                 raise BuilderError(f"{record_id}.{field}: unknown reference {ref!r}; expected {expected}")
+
+    def _artifact_row(self, artifact_id: str) -> dict[str, Any]:
+        row = next((item for item in self.state["artifacts"] if item["id"] == artifact_id), None)
+        if row is None:
+            raise BuilderError(f"evidence.artifact_id: unknown reference {artifact_id!r}; expected an artifact ID")
+        return row
+
+    @staticmethod
+    def _locator_matches_artifact(locator: str, artifact_locator: str) -> bool:
+        if locator == artifact_locator:
+            return True
+        return any(locator.startswith(artifact_locator + separator) for separator in (":", "#", "@"))
 
     def _append(self, collection: str, record: object) -> str:
         row = _json_record(record)
@@ -221,10 +239,29 @@ class SemanticStateBuilder:
         record_id: str | None = None,
     ) -> str:
         self._refs("evidence", "artifact_id", (artifact_id,), self._ids("artifacts"), "an artifact ID")
-        payload = {"artifact_id": artifact_id, "locator": locator, "kind": kind, "claim": claim, "result": result}
+        artifact = self._artifact_row(artifact_id)
+        locator_value = _required(locator, "evidence.locator")
+        artifact_locator = _required(artifact.get("locator"), "artifact.locator")
+        if not self._locator_matches_artifact(locator_value, artifact_locator):
+            raise BuilderError("evidence.locator: locator does not belong to the referenced artifact")
+        source_digest_value = _required(source_digest, "evidence.source_digest")
+        artifact_identity = artifact.get("content_identity")
+        artifact_content_digest = (
+            artifact_identity
+            if isinstance(artifact_identity, str) and artifact_identity.startswith("sha256:")
+            else None
+        )
+        producer_kind_value = _required(producer_kind, "evidence.producer.kind")
+        if (
+            artifact_content_digest is not None
+            and producer_kind_value in {"human", "local-model", "remote-model"}
+            and source_digest_value != artifact_content_digest
+        ):
+            raise BuilderError("evidence.source_digest: semantic reviewer evidence must match the referenced artifact content identity")
+        payload = {"artifact_id": artifact_id, "locator": locator_value, "kind": kind, "claim": claim, "result": result}
         ident = record_id or _record_id("evidence", payload)
         producer = {
-            "kind": _required(producer_kind, f"{ident}.producer.kind"),
+            "kind": producer_kind_value,
             "name": _required(producer_name, f"{ident}.producer.name"),
             "version": _required(producer_version, f"{ident}.producer.version"),
         }
@@ -237,11 +274,11 @@ class SemanticStateBuilder:
             self._refs(ident, "check_id", (check_id,), self._ids("checks"), "a check ID")
         observed_at = time or self.state["run"]["completed_at"]
         record = EvidenceRecord(
-            ident, artifact_id, _required(locator, f"{ident}.locator"), _required(kind, f"{ident}.kind"),
+            ident, artifact_id, locator_value, _required(kind, f"{ident}.kind"),
             _required(claim, f"{ident}.claim"), _required(result, f"{ident}.result"),
             _required(method, f"{ident}.method"), observed_at,
             _required(limitations, f"{ident}.limitations"), _required(inspection_origin, f"{ident}.inspection_origin"),
-            producer, _required(source_digest, f"{ident}.source_digest"),
+            producer, source_digest_value, artifact_content_digest,
         )
         evidence_id = self._append("evidence", record)
         row = next(item for item in self.state["evidence"] if item["id"] == evidence_id)
