@@ -13,6 +13,8 @@ ScanBench v1 remains the frozen honesty/integrity benchmark. ScanBench 2.0 adds 
 
 The evaluator does not keyword-match finding titles. An external reviewer or benchmark adapter prepares an adjudication that maps each independently reviewed condition to canonical finding, unknown, and evidence IDs. The adjudication is bound to `state_digest`, so it cannot silently be reused against a different Scan state.
 
+For a `found` outcome, valid references and evidence are not enough when the oracle declares `artifact_locators`. The referenced findings/evidence must collectively cover **all** declared ground-truth artifacts. This prevents an unrelated but valid finding elsewhere in the project from satisfying a condition. Artifact-grounding is reported as its own metric rather than being blended into a global score.
+
 ## Independent ground-truth review receipts
 
 Corpus membership does not imply that a fixture has received independent review. A separate review receipt can approve a fixture only when it:
@@ -52,7 +54,7 @@ The schema is `scanbench/ground_truth/holdout-manifest-schema-v2.json`. Secret h
 
 ## Metrics
 
-Detection recall, negative-control specificity, unknown honesty, false-clearance violations, evidence support, and reference integrity are published separately. There is no ScanBench quality score.
+Detection recall, negative-control specificity, unknown honesty, false-clearance violations, evidence support, artifact grounding, and reference integrity are published separately. There is no ScanBench quality score.
 
 ## Evaluation CLI
 
@@ -68,11 +70,13 @@ The corpus is separately validated with:
 
 The corpus validator verifies project/fixture identity, globally unique condition IDs, real artifact locators, declared milestone counts, and reports maturity progress without creating a blended score.
 
-### Corpus milestone M1
+### Current public corpus milestone
 
-M1 contains **6 projects / 29 conditions** covering authorization, data integrity, retry/idempotency, accessibility, documentation-contract drift, and test quality. It includes 10 `must_find`, 7 `must_not_find`, 6 `must_remain_unknown`, and 6 `must_not_clear` conditions.
+The current corpus contains **10 projects / 49 conditions** across authorization, data integrity, retry/idempotency, accessibility, documentation-contract drift, test quality, JavaScript webhook verification, TypeScript async-state races, shell/CI command injection, and Go HTTP resource boundaries.
 
-This is intentionally a milestone rather than a maturity claim. The project count and condition count remain explicit so benchmark growth cannot be presented as complete before the gate is met.
+Truth-class totals are 18 `must_find`, 11 `must_not_find`, 10 `must_remain_unknown`, and 10 `must_not_clear` conditions.
+
+This remains a milestone rather than a maturity claim. The project count and condition count stay explicit so benchmark growth cannot be presented as complete before the gate is met.
 
 ## Maturity target
 
