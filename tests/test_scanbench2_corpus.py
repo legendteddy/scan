@@ -16,16 +16,16 @@ CORPUS = ROOT / "scanbench" / "ground_truth"
 class ScanBench2CorpusTests(unittest.TestCase):
     def test_milestone_corpus_is_valid_and_counted_without_blended_score(self):
         summary = summarize_corpus(CORPUS)
-        self.assertEqual(summary["project_count"], 6)
-        self.assertEqual(summary["condition_count"], 29)
+        self.assertEqual(summary["project_count"], 10)
+        self.assertEqual(summary["condition_count"], 49)
         self.assertEqual(summary["maturity_target"], {"projects": 20, "conditions": 200})
         self.assertEqual(
             summary["truth_kind_counts"],
             {
-                "must_find": 10,
-                "must_not_find": 7,
-                "must_remain_unknown": 6,
-                "must_not_clear": 6,
+                "must_find": 18,
+                "must_not_find": 11,
+                "must_remain_unknown": 10,
+                "must_not_clear": 10,
             },
         )
         self.assertTrue(summary["no_blended_quality_score"])
@@ -38,11 +38,15 @@ class ScanBench2CorpusTests(unittest.TestCase):
             "web-accessibility-form",
             "docs-code-contract",
             "test-quality-mock",
+            "webhook-signature-js",
+            "async-cache-race-ts",
+            "shell-ci-eval",
+            "go-http-body-boundary",
         })
 
     def test_every_artifact_locator_resolves_inside_its_fixture_project(self):
         summary = summarize_corpus(CORPUS)
-        self.assertEqual(sum(summary["fixture_condition_counts"].values()), 29)
+        self.assertEqual(sum(summary["fixture_condition_counts"].values()), 49)
 
     def test_missing_artifact_locator_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
