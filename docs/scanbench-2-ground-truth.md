@@ -1,4 +1,4 @@
-﻿# ScanBench 2.0 ground-truth foundation
+# ScanBench 2.0 ground-truth foundation
 
 ScanBench v1 remains the frozen honesty/integrity benchmark. ScanBench 2.0 adds a separate effectiveness layer for questions v1 deliberately does not answer: did an inspector find a realistic defect, avoid a realistic false positive, preserve a genuine unknown, and avoid false clearance?
 
@@ -17,11 +17,25 @@ The evaluator does not keyword-match finding titles. An external reviewer or ben
 
 Detection recall, negative-control specificity, unknown honesty, false-clearance violations, evidence support, and reference integrity are published separately. There is no ScanBench quality score.
 
-## CLI
+## Evaluation CLI
 
 `scan bench2 TRUTH.json STATE.json SUBMISSION.json --json`
 
 A failing condition exits with Scan's validation-failed code. The evaluator never executes target code.
+
+## Corpus validation
+
+The corpus is separately validated with:
+
+`python -m scan_core.scanbench2_corpus scanbench/ground_truth --json`
+
+The corpus validator verifies project/fixture identity, globally unique condition IDs, real artifact locators, declared milestone counts, and reports maturity progress without creating a blended score.
+
+### Corpus milestone M1
+
+M1 contains **6 projects / 29 conditions** covering authorization, data integrity, retry/idempotency, accessibility, documentation-contract drift, and test quality. It includes 10 `must_find`, 7 `must_not_find`, 6 `must_remain_unknown`, and 6 `must_not_clear` conditions.
+
+This is intentionally a milestone rather than a maturity claim. The project count and condition count remain explicit so benchmark growth cannot be presented as complete before the gate is met.
 
 ## Maturity target
 
