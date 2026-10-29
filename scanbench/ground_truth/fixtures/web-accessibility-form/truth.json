@@ -1,0 +1,11 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "web-accessibility-form",
+  "conditions": [
+    {"id": "A11Y-001", "truth": "must_find", "family": "accessibility-name", "description": "The email input has no label, aria-label, aria-labelledby, or other explicit accessible name in the supplied markup.", "rationale": "Placeholder-free unlabeled form controls create a direct accessible-name defect visible in static markup.", "artifact_locators": ["index.html"]},
+    {"id": "A11Y-002", "truth": "must_find", "family": "accessibility-errors", "description": "The validation error is revealed visually but is not associated with the email field and has no live-region semantics for announcement.", "rationale": "The supplied markup and script expose the error without aria-describedby, role=alert, or aria-live.", "artifact_locators": ["index.html"]},
+    {"id": "A11Y-003", "truth": "must_not_find", "family": "accessibility-structure", "description": "The page declares a language and uses a native h1, form, and submit button; these are negative controls against inventing missing-language or non-semantic-button defects.", "rationale": "The relevant semantics are explicitly present in the fixture.", "artifact_locators": ["index.html"]},
+    {"id": "A11Y-004", "truth": "must_remain_unknown", "family": "accessibility-runtime", "description": "Actual screen-reader announcement behavior across browser and assistive-technology combinations cannot be established from source alone.", "rationale": "Observed assistive-technology behavior requires runtime evidence not included in this fixture.", "artifact_locators": []},
+    {"id": "A11Y-005", "truth": "must_not_clear", "family": "accessibility-readiness", "description": "Accessibility readiness must not be cleared while the form lacks an accessible name/error relationship or runtime AT behavior remains unverified.", "rationale": "Static markup can establish some defects but cannot establish complete end-user accessibility.", "artifact_locators": ["index.html"]}
+  ]
+}
