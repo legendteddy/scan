@@ -21,15 +21,21 @@
     "kotlin-offline-sync",
     "terraform-destruction",
     "react-checkout-state",
-    "csharp-message-delivery"
+    "csharp-message-delivery",
+    "github-actions-pr-target",
+    "php-upload-boundary",
+    "swift-mobile-secrets",
+    "aws-iam-least-privilege",
+    "graphql-tenant-auth",
+    "docker-build-supply-chain"
   ],
   "maturity_target": {
     "projects": 20,
     "conditions": 200
   },
   "milestone": {
-    "name": "corpus-m9",
-    "projects": 20,
-    "conditions": 149
+    "name": "corpus-m10",
+    "projects": 26,
+    "conditions": 209
   }
 }

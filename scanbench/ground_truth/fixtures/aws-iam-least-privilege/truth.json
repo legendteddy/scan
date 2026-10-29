@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "aws-iam-least-privilege",
+  "conditions": [
+    {"id":"IAM-001","truth":"must_find","family":"administrator-scope","description":"The policy allows Action * on Resource *.","rationale":"This grants the principal the broadest identity-policy capability instead of a bounded application permission set.","artifact_locators":["policy.json"]},
+    {"id":"IAM-002","truth":"must_find","family":"role-passing","description":"iam:PassRole is allowed on Resource *.","rationale":"Unrestricted role passing can expand privilege through services that accept IAM roles.","artifact_locators":["policy.json"]},
+    {"id":"IAM-003","truth":"must_find","family":"kms-scope","description":"kms:Decrypt is allowed on Resource *.","rationale":"The identity policy does not constrain decryption permission to intended keys.","artifact_locators":["policy.json"]},
+    {"id":"IAM-004","truth":"must_find","family":"role-assumption","description":"sts:AssumeRole is allowed for every role ARN in every AWS account.","rationale":"The identity-side permission is not scoped to intended target roles or accounts.","artifact_locators":["policy.json"]},
+    {"id":"IAM-005","truth":"must_not_find","family":"negative-control","description":"logs:GetLogEvents is scoped to one explicit application log-group ARN pattern.","rationale":"This statement must not be falsely described as Resource *.","artifact_locators":["policy.json"]},
+    {"id":"IAM-006","truth":"must_not_find","family":"negative-control","description":"The policy contains an explicit Deny for insecure S3 transport to the named bucket.","rationale":"The SecureTransport deny control is present and should not be reported missing.","artifact_locators":["policy.json"]},
+    {"id":"IAM-007","truth":"must_remain_unknown","family":"organization-controls","description":"Applicable service-control policies are not established by this identity policy.","rationale":"SCPs are organization-side external controls that can further constrain effective permissions.","artifact_locators":["policy.json"]},
+    {"id":"IAM-008","truth":"must_remain_unknown","family":"role-trust","description":"The trust policies of roles matched by sts:AssumeRole are not established here.","rationale":"Actual role assumption also depends on target-role trust policies that are absent from the fixture.","artifact_locators":["policy.json"]},
+    {"id":"IAM-009","truth":"must_not_clear","family":"least-privilege","description":"The identity policy must not be cleared as least-privileged.","rationale":"Administrative wildcard access and multiple unrestricted privilege-amplifying permissions are explicitly present.","artifact_locators":["policy.json"]},
+    {"id":"IAM-010","truth":"must_not_clear","family":"blast-radius","description":"The policy must not be cleared as having a narrowly bounded credential blast radius.","rationale":"Wildcard administration, decryption, role passing, and broad role assumption make the identity-side blast radius large even though external controls may exist.","artifact_locators":["policy.json"]}
+  ]
+}

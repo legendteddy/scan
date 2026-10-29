@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "docker-build-supply-chain",
+  "conditions": [
+    {"id":"IMG-001","truth":"must_find","family":"base-image-identity","description":"The base image is referenced by the mutable python:3.13 tag without a digest.","rationale":"A later build can resolve the same Dockerfile text to different base-image bytes.","artifact_locators":["Dockerfile"]},
+    {"id":"IMG-002","truth":"must_find","family":"remote-build-input","description":"ADD fetches a remote executable URL without a content digest or checksum in the Dockerfile.","rationale":"The build trusts mutable network content for an executable artifact without binding exact bytes.","artifact_locators":["Dockerfile"]},
+    {"id":"IMG-003","truth":"must_find","family":"dependency-pinning","description":"pip installs requests and flask without version pins or hashes.","rationale":"Dependency resolution can change over time and does not establish the exact installed package set.","artifact_locators":["Dockerfile"]},
+    {"id":"IMG-004","truth":"must_find","family":"runtime-privilege","description":"The Dockerfile never switches away from the default root user.","rationale":"The resulting container command runs as root unless an external runtime overrides the user.","artifact_locators":["Dockerfile"]},
+    {"id":"IMG-005","truth":"must_not_find","family":"negative-control","description":"The Dockerfile sets an explicit WORKDIR before application commands.","rationale":"An inspector should not report that the container has no declared working directory.","artifact_locators":["Dockerfile"]},
+    {"id":"IMG-006","truth":"must_not_find","family":"negative-control","description":"The final CMD uses exec-form JSON syntax.","rationale":"The fixture should not be falsely reported as using shell-form CMD for its main process.","artifact_locators":["Dockerfile"]},
+    {"id":"IMG-007","truth":"must_remain_unknown","family":"registry-policy","description":"Whether the build environment enforces signed or allowlisted base images is not established by the Dockerfile.","rationale":"Registry admission and signature verification are external build controls.","artifact_locators":["Dockerfile"]},
+    {"id":"IMG-008","truth":"must_remain_unknown","family":"runtime-policy","description":"Whether deployment policy overrides the container user to a non-root UID is not established here.","rationale":"Runtime securityContext or platform policy is outside the image definition.","artifact_locators":["Dockerfile"]},
+    {"id":"IMG-009","truth":"must_not_clear","family":"reproducible-build","description":"The image build must not be cleared as reproducible from the Dockerfile alone.","rationale":"The base image, remote executable, and Python packages are all resolved without immutable content identities.","artifact_locators":["Dockerfile"]},
+    {"id":"IMG-010","truth":"must_not_clear","family":"supply-chain-integrity","description":"The image must not be cleared as having established end-to-end supply-chain integrity.","rationale":"Remote executable content and dependencies are unbound, while external signing policy remains unknown.","artifact_locators":["Dockerfile"]}
+  ]
+}

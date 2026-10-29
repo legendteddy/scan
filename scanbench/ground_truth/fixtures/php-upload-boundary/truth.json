@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "php-upload-boundary",
+  "conditions": [
+    {"id":"PHP-001","truth":"must_find","family":"mime-trust","description":"Upload acceptance trusts the client-provided $_FILES file type beginning with image/.","rationale":"Multipart Content-Type is attacker-controlled and does not establish the uploaded bytes are an image.","artifact_locators":["upload.php"]},
+    {"id":"PHP-002","truth":"must_find","family":"path-confinement","description":"A user-controlled folder value is concatenated directly into the destination path.","rationale":"Traversal segments can escape the intended uploads subdirectory unless separately normalized and confined.","artifact_locators":["upload.php"]},
+    {"id":"PHP-003","truth":"must_find","family":"executable-upload","description":"The original client filename is stored under public/uploads without an extension allowlist or server-generated safe extension.","rationale":"A spoofed image MIME type can be paired with an executable server-side extension and placed in a public path.","artifact_locators":["upload.php"]},
+    {"id":"PHP-004","truth":"must_find","family":"resource-boundary","description":"The entire temporary upload is read into memory before any application-level size bound is checked.","rationale":"Large accepted uploads can consume process memory even though only emptiness is validated.","artifact_locators":["upload.php"]},
+    {"id":"PHP-005","truth":"must_not_find","family":"negative-control","description":"The handler checks for UPLOAD_ERR_OK before processing the file.","rationale":"An inspector should not report that PHP upload status is ignored.","artifact_locators":["upload.php"]},
+    {"id":"PHP-006","truth":"must_not_find","family":"negative-control","description":"The handler uses move_uploaded_file for the final move.","rationale":"The PHP upload-origin check provided by move_uploaded_file is present and should not be claimed absent.","artifact_locators":["upload.php"]},
+    {"id":"PHP-007","truth":"must_remain_unknown","family":"server-execution","description":"Whether the web server executes PHP or another active content type from public/uploads is not established by this file.","rationale":"Web-server handler configuration is external evidence.","artifact_locators":["upload.php"]},
+    {"id":"PHP-008","truth":"must_remain_unknown","family":"platform-limits","description":"The effective php.ini upload and request-size limits are not established by this handler.","rationale":"Platform configuration may impose additional bounds but is absent from the fixture.","artifact_locators":["upload.php"]},
+    {"id":"PHP-009","truth":"must_not_clear","family":"upload-safety","description":"The endpoint must not be cleared as safely confining arbitrary user uploads.","rationale":"Client MIME trust, user-controlled destination folders, and original filenames leave multiple confinement boundaries unresolved.","artifact_locators":["upload.php"]},
+    {"id":"PHP-010","truth":"must_not_clear","family":"code-execution-resistance","description":"The upload path must not be cleared as resistant to active-content upload attacks.","rationale":"Executable filename extensions are not rejected and server execution policy is unknown.","artifact_locators":["upload.php"]}
+  ]
+}

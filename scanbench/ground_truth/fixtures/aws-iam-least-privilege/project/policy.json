@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Sid":"AdminEverything","Effect":"Allow","Action":"*","Resource":"*"},
+    {"Sid":"PassAnyRole","Effect":"Allow","Action":"iam:PassRole","Resource":"*"},
+    {"Sid":"DecryptAnyKey","Effect":"Allow","Action":"kms:Decrypt","Resource":"*"},
+    {"Sid":"AssumeAnyRole","Effect":"Allow","Action":"sts:AssumeRole","Resource":"arn:aws:iam::*:role/*"},
+    {"Sid":"ScopedLogsRead","Effect":"Allow","Action":"logs:GetLogEvents","Resource":"arn:aws:logs:us-east-1:123456789012:log-group:/app/prod:log-stream:*"},
+    {"Sid":"DenyInsecureS3Transport","Effect":"Deny","Action":"s3:*","Resource":["arn:aws:s3:::example-private","arn:aws:s3:::example-private/*"],"Condition":{"Bool":{"aws:SecureTransport":"false"}}}
+  ]
+}
