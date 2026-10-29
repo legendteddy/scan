@@ -20,6 +20,7 @@ DEFAULT_TEXT_LIMIT = 800
 _MAX_SECTION_LIMIT = 1000
 _MAX_REF_LIMIT = 100
 _MAX_TEXT_LIMIT = 4000
+MAX_HANDOFF_BYTES = 4_000_000
 _SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational": 4}
 _CHECK_STATUS_ORDER = {"blocked": 0, "partial": 1, "not_assessed": 2, "assessed": 3, "not_applicable": 4}
 
@@ -355,6 +356,10 @@ def build_handoff(
     handoff["projection"]["projection_complete"] = not bool(flags)
     handoff["projection"]["truncation_reasons"] = sorted(flags)
     digest_payload = json.dumps(handoff, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    if len(digest_payload) > MAX_HANDOFF_BYTES:
+        raise ValueError(
+            f"handoff projection exceeds {MAX_HANDOFF_BYTES} bytes; lower section_limit, ref_limit, or text_limit"
+        )
     handoff["handoff_digest"] = "sha256:" + hashlib.sha256(digest_payload).hexdigest()
     return handoff
 

@@ -14,6 +14,7 @@ from .config import ScanConfig
 from .core import scan_project
 from .doctor import format_doctor, run_doctor
 from .evidence_federation import import_evidence_bundle, load_evidence_bundle_file
+from .handoff import build_handoff, canonical_handoff_json, format_handoff_summary
 from .errors import (
     CommandError,
     CoverageThresholdError,
@@ -37,7 +38,7 @@ from .settings import ProjectSettings, load_project_settings
 from .validate import validate_path
 from .version import __version__
 
-UTILITY_COMMANDS = {"validate", "render", "sarif", "import-sarif", "import-evidence", "serve", "bench", "bench2", "schema", "egress", "compare", "doctor"}
+UTILITY_COMMANDS = {"validate", "render", "sarif", "import-sarif", "import-evidence", "handoff", "serve", "bench", "bench2", "schema", "egress", "compare", "doctor"}
 
 
 def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool) -> None:
@@ -97,6 +98,13 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
         parser.add_argument("bundle_json", type=Path)
         parser.add_argument("--output", type=Path, required=True)
         parser.add_argument("--report", type=Path)
+        parser.add_argument("--json", action="store_true")
+    elif command == "handoff":
+        parser.add_argument("state_json", type=Path)
+        parser.add_argument("--output", type=Path)
+        parser.add_argument("--section-limit", type=int, default=100)
+        parser.add_argument("--ref-limit", type=int, default=12)
+        parser.add_argument("--text-limit", type=int, default=800)
         parser.add_argument("--json", action="store_true")
     elif command == "serve":
         parser.add_argument("source", nargs="?", type=Path, default=Path(".scan"))
