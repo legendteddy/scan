@@ -242,13 +242,20 @@ jobs:
         run: |
           import hashlib
           import json
+          import os
           from pathlib import Path
-          import shutil
           import subprocess
           import tempfile
+          import venv
           root = Path(tempfile.mkdtemp())
-          scan_cmd = shutil.which("scan")
-          assert scan_cmd is not None, "installed scan console entrypoint is not on PATH"
+          isolated = root / "wheel-venv"
+          venv.EnvBuilder(with_pip=True).create(isolated)
+          scripts = isolated / ("Scripts" if os.name == "nt" else "bin")
+          python_cmd = scripts / ("python.exe" if os.name == "nt" else "python")
+          scan_cmd = scripts / ("scan.exe" if os.name == "nt" else "scan")
+          wheel = next((Path.cwd() / "wheelhouse").glob("*.whl")).resolve()
+          subprocess.run([str(python_cmd), "-m", "pip", "install", "--disable-pip-version-check", "--no-deps", str(wheel)], check=True)
+          assert scan_cmd.is_file(), scan_cmd
           project = root / "project"
           project.mkdir()
           (project / "app.py").write_text("def value():\n    return 1\n", encoding="utf-8")
