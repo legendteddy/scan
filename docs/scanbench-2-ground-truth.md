@@ -42,6 +42,20 @@ After a real reviewer completes the review and returns a receipt, verify it agai
 
 Verification reuses the same digest, independence, and exact-condition-coverage rules described above.
 
+### Corpus-wide review campaigns
+
+For a full corpus, prepare all neutral requests in one deterministic package:
+
+`python -m scan_core.scanbench2_review_campaign prepare scanbench/ground_truth --output review-campaign.json`
+
+The campaign package contains one normal review request per fixture and **no approval evidence**. Its templates still have an empty reviewer identity, `independent_of_fixture_author=false`, and `decision=changes_requested`.
+
+Store completed receipts as `PROJECT_ID.json` files in a separate receipts directory, then summarize coverage with:
+
+`python -m scan_core.scanbench2_review_campaign coverage scanbench/ground_truth REVIEW_RECEIPTS_DIR --json`
+
+Coverage reports approved projects and conditions separately from `changes_requested`, invalid/stale, and missing receipts. A receipt whose fixture digest no longer matches is counted as invalid, not reviewed. The tool also reports orphan receipt files and whether the independently approved project/condition counts satisfy the corpus numeric target. It does not claim holdout quality or inspector effectiveness, and it never produces a blended quality score.
+
 ## External holdout precommitments
 
 A real holdout should not be checked into the public repository before evaluation. Instead, a custodian can publish or otherwise timestamp a small precommitment manifest containing only:
