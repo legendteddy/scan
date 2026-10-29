@@ -66,7 +66,15 @@ If submission is disabled or fails, the same receipt is preserved under:
 
 The root can be changed with `SCAN_FEEDBACK_HOME` or `--feedback-home`.
 
-Agents should report whether the receipt was `submitted`, recognized as a `duplicate`, or `queued` locally.
+When submission becomes authorized, retry a bounded batch of queued receipts with:
+
+```bash
+python -m scan_core.feedback --flush --submit auto --json
+```
+
+`--flush` uses the same authorization policy as a new receipt. It validates the queued receipt structure and fingerprint, compares the queued copy with the canonical receipt under `receipts/`, and only then attempts GitHub submission. A `submitted` or `duplicate` result removes the outbox copy but preserves the canonical receipt. Invalid, tampered, or failed submissions remain queued and are reported. Each invocation processes at most 20 queued receipts so one agent session cannot create an unbounded burst of external writes.
+
+Agents should report whether the current receipt was `submitted`, recognized as a `duplicate`, or `queued` locally, and report outbox flush failures or invalid receipts when present.
 
 ## GitHub behavior
 

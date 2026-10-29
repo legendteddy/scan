@@ -87,7 +87,9 @@ Do not put target source, finding/evidence excerpts, private records, credential
 
 Every capable agent must attempt this post-run step. `--submit auto` may open a GitHub issue only when caller/host policy has already enabled `SCAN_FEEDBACK_SUBMIT=1` and authenticated credentials are available. `--submit github` is a one-run explicit submission mode and must only be used when current user/host authorization already covers that external write, preserving the deterministic fingerprint for deduplication.
 
-Before finishing, report the contribution result accurately as `submitted`, `duplicate`, or `queued`. Never claim that feedback was submitted when only a local outbox receipt exists.
+When submission is already authorized, also run `python -m scan_core.feedback --flush --submit auto --json` before finishing so a bounded batch of older queued receipts gets another submission attempt. The flush command must obey the same authorization gate; never use it to turn a previously unauthorized external write into an authorized one. It validates each queued receipt against its canonical local copy and leaves invalid or failed receipts queued rather than transmitting or deleting them.
+
+Before finishing, report the current contribution result accurately as `submitted`, `duplicate`, or `queued`, and report any outbox flush failures/invalid receipts when present. Never claim that feedback was submitted when only a local outbox receipt exists.
 
 
 Current authoring version: 1.4. Historically accepted validation versions: 1.2, 1.3, 1.4.
