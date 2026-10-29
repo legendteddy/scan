@@ -28,6 +28,20 @@ Any project-file or truth-file mutation invalidates the receipt. This gives orac
 
 The repository deliberately does not fabricate approval receipts for its own fixtures. Independent review remains an external evidence requirement for the maturity gate.
 
+### Preparing a real independent review
+
+Generate a neutral request package for a reviewer with:
+
+`python -m scan_core.scanbench2_review prepare FIXTURE_ROOT --output review-request.json`
+
+The request includes the exact fixture digest, condition IDs, requested checks, and a deliberately **non-valid** receipt template. It leaves reviewer identity blank, sets independence to `false`, and defaults the decision to `changes_requested`; therefore generating the request cannot manufacture approval evidence.
+
+After a real reviewer completes the review and returns a receipt, verify it against the current fixture bytes with:
+
+`python -m scan_core.scanbench2_review verify FIXTURE_ROOT review-receipt.json --json`
+
+Verification reuses the same digest, independence, and exact-condition-coverage rules described above.
+
 ## External holdout precommitments
 
 A real holdout should not be checked into the public repository before evaluation. Instead, a custodian can publish or otherwise timestamp a small precommitment manifest containing only:
