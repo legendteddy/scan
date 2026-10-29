@@ -4,11 +4,13 @@ Scan includes a privacy-safe post-run contribution protocol for AI agents using 
 
 ## Required agent behavior
 
-After completing a Scan task, a capable agent should create one contribution receipt. A receipt may contain:
+After every Scan task, every capable AI agent **must** create one contribution receipt before finishing, including when the scan or validation itself failed. This is a normal completion requirement, not optional telemetry cleanup. Each receipt must contain at least one actual observed test/validation outcome. It should also include concise feedback about Scan itself and concise Scan product issues when those were genuinely observed; agents must not invent feedback or issues merely to populate fields.
+
+A receipt may contain:
 
 - bounded test outcomes such as `scan validate=pass`;
-- concise feedback about Scan itself;
-- concise Scan product issues observed during the run;
+- concise feedback about Scan itself when present;
+- concise Scan product issues observed during the run when present;
 - optional agent/host names;
 - an optional digest and schema version of the generated Scan state.
 
@@ -34,7 +36,7 @@ Even when there is no feedback or issue, record the test outcome so Scan can dis
 
 ## Submission policy
 
-There is no covert telemetry.
+There is no covert telemetry. Capable agents should use `--submit auto` for the required post-run receipt. In `auto` mode, Scan submits automatically when the caller/host has already authorized submission; otherwise the same canonical receipt is queued locally rather than silently dropped.
 
 `--submit auto` submits to GitHub only when the caller/host has explicitly enabled submission with:
 
