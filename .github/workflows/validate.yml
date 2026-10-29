@@ -39,13 +39,17 @@ jobs:
           "$RUNNER_TEMP/wheel-venv/bin/python" -m pip install --disable-pip-version-check "$RUNNER_TEMP"/dist/*.whl
           (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/scan" doctor "$GITHUB_WORKSPACE" --json > doctor-wheel.json)
           (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/scan-bundle" --help > scan-bundle-wheel.txt)
-          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/scan" --help > scan-help-wheel.txt)
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/scan" handoff --help > /dev/null)
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/scan" import-evidence --help > /dev/null)
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/scan" import-observed --help > /dev/null)
           python -m venv "$RUNNER_TEMP/sdist-venv"
           "$RUNNER_TEMP/sdist-venv/bin/python" -m pip install --disable-pip-version-check "$RUNNER_TEMP"/dist/*.tar.gz
           (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/scan" doctor "$GITHUB_WORKSPACE" --json > doctor-sdist.json)
           (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/scan-bundle" --help > scan-bundle-sdist.txt)
-          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/scan" --help > scan-help-sdist.txt)
-          python -c "import json,os; from pathlib import Path; r=Path(os.environ['RUNNER_TEMP']); wh=(r/'scan-help-wheel.txt').read_text(); sd=(r/'scan-help-sdist.txt').read_text(); assert json.load(open(r/'doctor-wheel.json'))['overall'] in ('pass','warn'); assert json.load(open(r/'doctor-sdist.json'))['overall'] in ('pass','warn'); assert 'create' in (r/'scan-bundle-wheel.txt').read_text(); assert 'verify' in (r/'scan-bundle-sdist.txt').read_text(); assert all(c in wh for c in ('handoff','import-evidence','import-observed')); assert all(c in sd for c in ('handoff','import-evidence','import-observed'))"
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/scan" handoff --help > /dev/null)
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/scan" import-evidence --help > /dev/null)
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/scan" import-observed --help > /dev/null)
+          python -c "import json,os; from pathlib import Path; r=Path(os.environ['RUNNER_TEMP']); assert json.load(open(r/'doctor-wheel.json'))['overall'] in ('pass','warn'); assert json.load(open(r/'doctor-sdist.json'))['overall'] in ('pass','warn'); assert 'create' in (r/'scan-bundle-wheel.txt').read_text(); assert 'verify' in (r/'scan-bundle-sdist.txt').read_text()"
 
       - name: Install Scan package
         run: python -m pip install --disable-pip-version-check .
@@ -172,9 +176,9 @@ jobs:
         run: |
           python -B -m unittest discover -s tests -p "test_*.py" -q
           scan-bundle --help
-          scan --help | grep -q "handoff"
-          scan --help | grep -q "import-evidence"
-          scan --help | grep -q "import-observed"
+          scan handoff --help
+          scan import-evidence --help
+          scan import-observed --help
           scan bench
           scan schema --version 1.4 > /tmp/scan-schema.json
 
