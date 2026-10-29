@@ -29,7 +29,7 @@ scan . --offline
 
 The second run uses the previous local `.scan/state.json` as its baseline and reports what was added, changed, removed or unchanged, while keeping fresh and reused evidence separate. `scan doctor .` is an offline, non-destructive readiness diagnostic: it checks installed package assets, target access and optional Git support, and uses a temporary local output probe that it removes before returning. It does not install, repair or contact anything.
 
-Scan 0.4.0 is published on PyPI. Install the packaged CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`. Pin `scan-skill==0.4.0` when you need that exact release.
+The latest published release remains Scan 0.4.0. This release branch prepares **Scan 0.5.0**; until the tag is published, install the candidate from this exact reviewed source/commit rather than assuming PyPI contains v0.5.0. Install the current published CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`, and pin `scan-skill==0.4.0` when you need the current published release.
 
 ## What makes Scan different?
 
@@ -46,7 +46,7 @@ For the concrete false-confidence failure mode Scan is designed to prevent, read
 
 ## Standalone core
 
-The packaged standalone core requires **Python 3.11+**. It can inventory a local project, create canonical Scan 1.4 JSON, compare repeated scans against a prior local state, safely reuse compatible higher-level static evidence, render a self-contained HTML report from that exact state, validate both formats, enforce deterministic privacy/redaction metadata, produce a no-network egress preview, and (in v0.5 development) export canonical findings as SARIF 2.1.0.
+The packaged standalone core requires **Python 3.11+**. It can inventory a local project, create canonical Scan 1.4 JSON, compare repeated scans against a prior local state, safely reuse compatible higher-level static evidence, render a self-contained HTML report from that exact state, validate both formats, enforce deterministic privacy/redaction metadata, produce a no-network egress preview, and export canonical findings as SARIF 2.1.0 and conservatively import bounded external SARIF results.
 
 ```bash
 python -m pip install .
