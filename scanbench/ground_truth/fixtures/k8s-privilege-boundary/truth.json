@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "k8s-privilege-boundary",
+  "conditions": [
+    {"id":"K8S-001","truth":"must_find","family":"container-privilege","description":"The workload container is explicitly configured with privileged: true.","rationale":"Privileged containers receive broad host capabilities and defeat normal container isolation assumptions.","artifact_locators":["deployment.yaml"]},
+    {"id":"K8S-002","truth":"must_find","family":"root-execution","description":"The container explicitly runs as UID 0.","rationale":"Running as root increases the impact of a container compromise and weakens least-privilege posture.","artifact_locators":["deployment.yaml"]},
+    {"id":"K8S-003","truth":"must_find","family":"host-filesystem","description":"The pod mounts the host root directory through a writable hostPath volume.","rationale":"The container can directly modify host filesystem state through /host.","artifact_locators":["deployment.yaml"]},
+    {"id":"K8S-004","truth":"must_find","family":"service-account-exposure","description":"The pod explicitly automounts its service-account token while also running with broad host privileges.","rationale":"A compromise can combine workload credentials with host access, increasing blast radius.","artifact_locators":["deployment.yaml"]},
+    {"id":"K8S-005","truth":"must_not_find","family":"negative-control","description":"The container declares readOnlyRootFilesystem: true.","rationale":"This is an explicit filesystem-hardening control and should not be falsely reported as absent.","artifact_locators":["deployment.yaml"]},
+    {"id":"K8S-006","truth":"must_not_find","family":"negative-control","description":"The container declares CPU and memory requests and limits.","rationale":"Resource limits are present and should not be reported as missing.","artifact_locators":["deployment.yaml"]},
+    {"id":"K8S-007","truth":"must_remain_unknown","family":"cluster-policy","description":"Whether admission policy blocks privileged pods or hostPath usage in the target cluster is not established by this manifest.","rationale":"Admission enforcement is a cluster-side control requiring external evidence.","artifact_locators":["deployment.yaml"]},
+    {"id":"K8S-008","truth":"must_remain_unknown","family":"service-account-rbac","description":"The actual RBAC permissions granted to the pod service account are not established by this Deployment manifest.","rationale":"No Role, ClusterRole, or binding artifacts are present.","artifact_locators":["deployment.yaml"]},
+    {"id":"K8S-009","truth":"must_not_clear","family":"workload-isolation","description":"The workload must not be cleared as least-privileged or strongly isolated from the host.","rationale":"privileged root execution plus writable host root access contradicts such a clearance.","artifact_locators":["deployment.yaml"]},
+    {"id":"K8S-010","truth":"must_not_clear","family":"credential-blast-radius","description":"The workload must not be cleared as having a minimal credential blast radius.","rationale":"A service-account token is mounted, while its RBAC scope remains unknown and the container has broad host access.","artifact_locators":["deployment.yaml"]}
+  ]
+}
