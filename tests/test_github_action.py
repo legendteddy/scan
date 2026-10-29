@@ -93,6 +93,7 @@ class CompositeActionTests(unittest.TestCase):
         self.assertNotIn("upload-sarif", text)
         self.assertNotIn("upload-artifact", text)
         self.assertIn("analysis-complete", text)
+        self.assertIn("project-config", text)
 
     def test_runner_writes_external_outputs_and_preserves_target_tree(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -146,6 +147,61 @@ class CompositeActionTests(unittest.TestCase):
             sarif = json.loads(sarif_path.read_text(encoding="utf-8"))
             self.assertEqual(sarif["version"], "2.1.0")
             self.assertEqual(sarif["runs"][0]["results"], [])
+
+    def test_runner_ignores_target_project_config_by_default_and_can_opt_in(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            workspace = base / "workspace"
+            target = workspace / "project"
+            (target / ".scan").mkdir(parents=True)
+            (target / "README.md").write_text("# Demo\n", encoding="utf-8")
+            (target / ".scan" / "config.toml").write_text(
+                "[scan]\nmax_total_bytes = 123456\nfollow_internal_links = true\n"
+                "[exclude]\npatterns = [\"README.md\"]\n",
+                encoding="utf-8",
+            )
+            common = os.environ.copy()
+            common.update({
+                "GITHUB_ACTION_PATH": str(ROOT),
+                "GITHUB_WORKSPACE": str(workspace),
+                "SCAN_INPUT_PATH": "project",
+                "SCAN_INPUT_BASELINE": "none",
+                "SCAN_INPUT_JOB_SUMMARY": "false",
+            })
+
+            default_out = base / "default"
+            default_env = dict(common)
+            default_env["SCAN_INPUT_OUTPUT_DIRECTORY"] = str(default_out)
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "scripts" / "github_action.py")],
+                cwd=workspace, env=default_env, text=True, capture_output=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            default_state = json.loads((default_out / "state.json").read_text(encoding="utf-8"))
+            policy = default_state["extensions"]["configuration_policy"]
+            self.assertEqual(policy["project_config_source"], "ignored")
+            self.assertEqual(policy["effective"]["max_total_bytes"], 250_000_000)
+            self.assertFalse(policy["effective"]["follow_internal_links"])
+            self.assertIn("README.md", {row["locator"] for row in default_state["artifacts"]})
+
+            opted_out = base / "opted-in"
+            opted_env = dict(common)
+            opted_env.update({
+                "SCAN_INPUT_OUTPUT_DIRECTORY": str(opted_out),
+                "SCAN_INPUT_PROJECT_CONFIG": "true",
+            })
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "scripts" / "github_action.py")],
+                cwd=workspace, env=opted_env, text=True, capture_output=True,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            opted_state = json.loads((opted_out / "state.json").read_text(encoding="utf-8"))
+            policy = opted_state["extensions"]["configuration_policy"]
+            self.assertEqual(policy["project_config_source"], "project")
+            self.assertEqual(policy["effective"]["max_total_bytes"], 123456)
+            self.assertTrue(policy["effective"]["follow_internal_links"])
+            opted_rows = {row["locator"]: row for row in opted_state["artifacts"]}
+            self.assertEqual(opted_rows["README.md"]['status'], "excluded")
 
     def test_runner_reports_artifact_delta_from_explicit_validated_baseline(self):
         with tempfile.TemporaryDirectory() as directory:

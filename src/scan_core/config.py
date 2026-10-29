@@ -11,6 +11,7 @@ PrivacyMode = Literal["offline", "local", "controlled-remote"]
 RedactionLevel = Literal["none", "standard", "strict"]
 ScanMode = Literal["quick", "deep", "forensic"]
 BaselineMode = Literal["auto", "none", "explicit"]
+ProjectConfigSource = Literal["api", "built_in", "project", "ignored"]
 Completion = Literal["complete", "partial", "blocked"]
 
 
@@ -73,6 +74,7 @@ class ScanConfig:
     max_baseline_state_bytes: int = 64_000_000
     changed_since: str | None = None
     git_metadata_roots: tuple[Path, ...] = ()
+    project_config_source: ProjectConfigSource = "api"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "root", Path(self.root))
@@ -83,6 +85,8 @@ class ScanConfig:
             object.__setattr__(self, "output_html", Path(self.output_html))
         if self.scan_mode not in _MODE_EXCLUDES:
             raise ValueError(f"Unsupported scan mode: {self.scan_mode}")
+        if self.project_config_source not in {"api", "built_in", "project", "ignored"}:
+            raise ValueError(f"Unsupported project_config_source: {self.project_config_source}")
         if self.baseline_path is not None:
             object.__setattr__(self, "baseline_path", Path(self.baseline_path))
         if self.changed_since is not None:

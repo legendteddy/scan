@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -43,6 +44,32 @@ def _repo(root: Path) -> None:
         (root / name).write_text(content, encoding="utf-8")
     _git(root, "add", ".")
     _git(root, "commit", "-m", "base")
+
+
+def _hostile_filter(root: Path, kind: str) -> Path:
+    sentinel = root / f"{kind}-filter-ran.txt"
+    script = root / f"hostile-{kind}-filter.py"
+    if kind == "clean":
+        script.write_text(
+            "import pathlib, sys\n"
+            "pathlib.Path(sys.argv[1]).write_text('ran', encoding='utf-8')\n"
+            "sys.stdout.buffer.write(sys.stdin.buffer.read())\n",
+            encoding="utf-8",
+        )
+        _git(root, "config", "filter.evil.clean", subprocess.list2cmdline([sys.executable, str(script), str(sentinel)]))
+    elif kind == "process":
+        script.write_text(
+            "import pathlib, sys\n"
+            "pathlib.Path(sys.argv[1]).write_text('ran', encoding='utf-8')\n"
+            "raise SystemExit(1)\n",
+            encoding="utf-8",
+        )
+        _git(root, "config", "filter.evil.process", subprocess.list2cmdline([sys.executable, str(script), str(sentinel)]))
+    else:
+        raise AssertionError(kind)
+    _git(root, "config", "filter.evil.required", "true")
+    (root / ".gitattributes").write_text("*.txt filter=evil\n", encoding="utf-8")
+    return sentinel
 
 
 class GitChangedScopeTests(unittest.TestCase):
@@ -188,6 +215,30 @@ class GitChangedScopeTests(unittest.TestCase):
             with self.assertRaisesRegex(Exception, "local Git executable"):
                 inspect_git_change_scope(root, "HEAD")
 
+    def test_changed_scope_does_not_execute_clean_filter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _repo(root)
+            sentinel = _hostile_filter(root, "clean")
+            (root / "modify.txt").write_text("after\n", encoding="utf-8")
+
+            scope = inspect_git_change_scope(root, "HEAD")
+
+            self.assertFalse(sentinel.exists())
+            self.assertIn("modify.txt", scope.modified)
+
+    def test_changed_scope_does_not_execute_process_filter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            _repo(root)
+            sentinel = _hostile_filter(root, "process")
+            (root / "modify.txt").write_text("after\n", encoding="utf-8")
+
+            scope = inspect_git_change_scope(root, "HEAD")
+
+            self.assertFalse(sentinel.exists())
+            self.assertIn("modify.txt", scope.modified)
+
     def test_git_invocation_is_argument_array_local_only_and_disables_helpers(self):
         responses = [
             subprocess.CompletedProcess([], 0, b"git version 9.9\n", b""),
@@ -196,12 +247,13 @@ class GitChangedScopeTests(unittest.TestCase):
             subprocess.CompletedProcess([], 0, b"b" * 40 + b"\n", b""),
             subprocess.CompletedProcess([], 0, b"", b""),
             subprocess.CompletedProcess([], 0, b"", b""),
+            subprocess.CompletedProcess([], 0, b"", b""),
         ]
         with tempfile.TemporaryDirectory() as directory, \
              mock.patch("scan_core.git_change.shutil.which", return_value="git"), \
              mock.patch("scan_core.git_change.subprocess.run", side_effect=responses) as runner:
             inspect_git_change_scope(Path(directory), "HEAD~1")
-        self.assertEqual(runner.call_count, 6)
+        self.assertEqual(runner.call_count, 7)
         for call in runner.call_args_list:
             command = call.args[0]
             self.assertIsInstance(command, list)
@@ -211,8 +263,9 @@ class GitChangedScopeTests(unittest.TestCase):
             self.assertNotIn("pull", command)
             self.assertNotIn("push", command)
         subcommands = [call.args[0][call.args[0].index("protocol.allow=never") + 1] for call in runner.call_args_list]
-        self.assertEqual(subcommands, ["--version", "rev-parse", "rev-parse", "rev-parse", "diff", "ls-files"])
+        self.assertEqual(subcommands, ["--version", "rev-parse", "rev-parse", "rev-parse", "diff", "ls-files", "ls-files"])
         diff_command = runner.call_args_list[4].args[0]
+        self.assertIn("--cached", diff_command)
         self.assertIn("a" * 40, diff_command)
         self.assertNotIn("HEAD~1", diff_command)
 

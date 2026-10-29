@@ -27,6 +27,10 @@ inputs:
     description: Optional local Git ref used only as advisory changed-scope context
     required: false
     default: ""
+  project-config:
+    description: "Trust target .scan/config.toml for settings not explicitly supplied by the workflow owner"
+    required: false
+    default: "false"
   excludes:
     description: Optional newline-separated exclusion patterns
     required: false
@@ -137,6 +141,7 @@ runs:
         SCAN_INPUT_REDACT: ${{ inputs.redact }}
         SCAN_INPUT_BASELINE: ${{ inputs.baseline }}
         SCAN_INPUT_CHANGED_SINCE: ${{ inputs['changed-since'] }}
+        SCAN_INPUT_PROJECT_CONFIG: ${{ inputs['project-config'] }}
         SCAN_INPUT_EXCLUDES: ${{ inputs.excludes }}
         SCAN_INPUT_SENSITIVE_PATHS: ${{ inputs['sensitive-paths'] }}
         SCAN_INPUT_OUTPUT_DIRECTORY: ${{ inputs['output-directory'] }}

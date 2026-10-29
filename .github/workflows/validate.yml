@@ -276,6 +276,6 @@ jobs:
         if: ${{ !cancelled() && steps.install-wheel.outcome == 'success' }}
         run: scan bench
 
-      - name: Run installed v0.3 acceptance matrix
+      - name: Run installed v0.5 acceptance matrix
         if: ${{ !cancelled() && steps.install-wheel.outcome == 'success' }}
-        run: python scripts/v03_acceptance.py
+        run: python scripts/v05_acceptance.py
