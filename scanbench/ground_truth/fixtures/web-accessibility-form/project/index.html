@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Newsletter</title></head>
+<body>
+  <main>
+    <h1>Newsletter signup</h1>
+    <form id="signup">
+      <input id="email" name="email" type="email" required>
+      <p id="error" hidden style="color: red">Enter a valid email address.</p>
+      <button type="submit">Subscribe</button>
+    </form>
+  </main>
+  <script>
+    const form = document.querySelector('#signup');
+    const email = document.querySelector('#email');
+    const error = document.querySelector('#error');
+    form.addEventListener('submit', (event) => {
+      if (!email.validity.valid) {
+        event.preventDefault();
+        error.hidden = false;
+      }
+    });
+  </script>
+</body>
+</html>

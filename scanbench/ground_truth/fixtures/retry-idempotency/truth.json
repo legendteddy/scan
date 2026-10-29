@@ -1,0 +1,11 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "retry-idempotency",
+  "conditions": [
+    {"id": "RETRY-001", "truth": "must_find", "family": "idempotency", "description": "charge_with_retry can repeat a charge after a timeout without an idempotency key or equivalent request identity.", "rationale": "A timeout does not prove the remote charge failed, so repeating a non-idempotent operation can double-charge an account.", "artifact_locators": ["worker.py"]},
+    {"id": "RETRY-002", "truth": "must_not_find", "family": "retry-policy", "description": "The retry loop is bounded to three attempts with increasing delays and is a negative control for unbounded retry behavior.", "rationale": "A bounded retry policy should not be reported as an infinite retry merely because retries exist.", "artifact_locators": ["worker.py"]},
+    {"id": "RETRY-003", "truth": "must_remain_unknown", "family": "provider-runtime", "description": "Whether the payment provider independently deduplicates identical charges cannot be established from this fixture.", "rationale": "Provider-side idempotency is an external service guarantee and is not shown in repository evidence.", "artifact_locators": []},
+    {"id": "RETRY-004", "truth": "must_not_clear", "family": "release-readiness", "description": "Payment retry safety must not be cleared while RETRY-001 exists or provider-side behavior remains unverified.", "rationale": "The bounded loop limits attempts but does not establish exactly-once charging.", "artifact_locators": ["worker.py"]},
+    {"id": "RETRY-005", "truth": "must_not_find", "family": "error-handling", "description": "send_receipt explicitly returns False on mail delivery failure and is a negative control against claiming the exception is silently converted into success.", "rationale": "Best-effort receipt delivery has an explicit failure result in the supplied function.", "artifact_locators": ["worker.py"]}
+  ]
+}
