@@ -1,15 +1,18 @@
 """Observed runtime/test evidence receipt import tests."""
 from __future__ import annotations
 
+from contextlib import redirect_stdout
 from copy import deepcopy
+import io
 import json
 from pathlib import Path
 import tempfile
 import unittest
 
 from scan_core import ScanConfig, scan_project
+from scan_core.cli import main as cli_main
 from scan_core.observed_receipt import import_observed_receipt
-from scan_core.state import state_digest
+from scan_core.state import canonical_state_json, state_digest
 
 
 class ObservedReceiptTests(unittest.TestCase):
@@ -190,6 +193,37 @@ class ObservedReceiptTests(unittest.TestCase):
         conflict["observations"].append(second)
         with self.assertRaisesRegex(ValueError, "conflicts with an earlier observation"):
             import_observed_receipt(state, conflict)
+
+    def test_cli_import_observed_executes_and_preserves_honesty_boundary(self):
+        state, artifact = self._state()
+        receipt = self._receipt(state, artifact, outcome="pass")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state_path = root / "state.json"
+            receipt_path = root / "observed.json"
+            output_path = root / "observed-state.json"
+            state_path.write_text(canonical_state_json(state) + "\n", encoding="utf-8", newline="\n")
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                code = cli_main([
+                    "import-observed",
+                    str(state_path),
+                    str(receipt_path),
+                    "--output",
+                    str(output_path),
+                    "--json",
+                ])
+            self.assertEqual(code, 0)
+            summary = json.loads(stdout.getvalue())
+            self.assertEqual(summary["imported_controls"], 1)
+            self.assertEqual(summary["imported_evidence"], 1)
+            imported_state = json.loads(output_path.read_text(encoding="utf-8"))
+            import_receipt = imported_state["extensions"]["observed_evidence_imports"][-1]
+            self.assertFalse(import_receipt["authorization_attestation"]["verified_by_scan"])
+            self.assertFalse(import_receipt["execution"]["target_executed_by_scan_during_import"])
+            self.assertFalse(import_receipt["execution"]["network_used_by_scan_during_import"])
+            self.assertFalse(imported_state["coverage"]["analysis_complete"])
 
 
 if __name__ == "__main__":

@@ -1,3 +1,3 @@
 """Single source of truth for the Scan Core software version."""
 
-__version__ = "0.4.0"
+__version__ = "0.6.0.dev0"

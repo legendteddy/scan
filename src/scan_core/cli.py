@@ -282,6 +282,54 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
             print(f"Ignored duplicate results: {imported.ignored_results}")
             print(f"State written to {args.output}")
         return int(ExitCode.OK)
+    if command == "import-observed":
+        for path in (args.state_json, args.receipt_json):
+            if not path.exists():
+                raise SourceError(f"Source path does not exist: {path}")
+        state = validate_path(args.state_json)
+        receipt, raw = load_observed_receipt_file(args.receipt_json)
+        imported = import_observed_receipt(state, receipt, source_bytes=raw)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(canonical_state_json(imported.state) + "\n", encoding="utf-8", newline="\n")
+        if args.report is not None:
+            render_report(imported.state, args.report)
+        summary = {
+            **imported.as_dict(),
+            "state_path": str(args.output),
+            "report_path": str(args.report) if args.report else None,
+        }
+        if args.json:
+            print(json.dumps(summary, ensure_ascii=True, sort_keys=True, separators=(",", ":")))
+        else:
+            print(f"Imported findings: {imported.imported_findings}")
+            print(f"Imported controls: {imported.imported_controls}")
+            print(f"Imported unknowns: {imported.imported_unknowns}")
+            print(f"Imported evidence: {imported.imported_evidence}")
+            print(f"Unmapped observations retained as unknowns: {imported.unmapped_observations}")
+            print(f"Ignored duplicate observations: {imported.ignored_observations}")
+            print(f"State written to {args.output}")
+        return int(ExitCode.OK)
+    if command == "handoff":
+        if not args.state_json.exists():
+            raise SourceError(f"Source path does not exist: {args.state_json}")
+        state = validate_path(args.state_json)
+        handoff = build_handoff(
+            state,
+            section_limit=args.section_limit,
+            ref_limit=args.ref_limit,
+            text_limit=args.text_limit,
+        )
+        encoded = canonical_handoff_json(handoff)
+        if args.output is not None:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(encoded + "\n", encoding="utf-8", newline="\n")
+        if args.json:
+            print(encoded)
+        else:
+            print(format_handoff_summary(handoff))
+            if args.output is not None:
+                print(f"Handoff written to {args.output}")
+        return int(ExitCode.OK)
     if command == "serve":
         if not args.source.exists():
             raise SourceError(f"Source path does not exist: {args.source}")
