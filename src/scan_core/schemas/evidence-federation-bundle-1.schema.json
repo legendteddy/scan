@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/legendteddy/scan/schema/evidence-federation-bundle-1.schema.json",
+  "title": "Scan evidence federation bundle v1",
+  "type": "object",
+  "required": ["scan_evidence_bundle_version", "target", "producer", "adapter", "source", "coverage", "results"],
+  "properties": {
+    "scan_evidence_bundle_version": {"const": "1"},
+    "target": {
+      "type": "object",
+      "required": ["snapshot_digest"],
+      "properties": {
+        "snapshot_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "state_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "producer": {
+      "type": "object",
+      "required": ["kind", "name", "version"],
+      "properties": {
+        "kind": {"const": "external-tool"},
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "version": {"type": "string", "minLength": 1, "maxLength": 256}
+      },
+      "additionalProperties": false
+    },
+    "adapter": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "version": {"type": "string", "minLength": 1, "maxLength": 256}
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "required": ["format", "digest"],
+      "properties": {
+        "format": {"type": "string", "minLength": 1, "maxLength": 256},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "required": ["scope", "limitations", "whole_project_complete"],
+      "properties": {
+        "scope": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "limitations": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "whole_project_complete": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "results": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {"$ref": "#/$defs/result"}
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "required": ["kind", "class", "claim", "result", "method", "limitations"],
+      "properties": {
+        "locator": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "kind": {"enum": ["static", "observed", "inferred", "unverified"]},
+        "class": {"type": "string", "minLength": 1, "maxLength": 128},
+        "claim": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "result": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "method": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "limitations": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "observed_at": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "finding": {
+      "type": "object",
+      "required": ["title", "impact", "severity", "confidence", "verification_state", "uncertainty", "recommendation", "safe_verification"],
+      "properties": {
+        "title": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "impact": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "severity": {"enum": ["critical", "high", "medium", "low", "informational"]},
+        "confidence": {"type": "string", "minLength": 1, "maxLength": 128},
+        "verification_state": {"enum": ["static", "observed", "inferred", "unverified"]},
+        "uncertainty": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "recommendation": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "safe_verification": {"type": "string", "minLength": 1, "maxLength": 20000}
+      },
+      "additionalProperties": false
+    },
+    "unknown": {
+      "type": "object",
+      "required": ["question", "reason", "impact", "next_safe_step"],
+      "properties": {
+        "question": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "impact": {"type": "string", "minLength": 1, "maxLength": 20000},
+        "next_safe_step": {"type": "string", "minLength": 1, "maxLength": 20000}
+      },
+      "additionalProperties": false
+    },
+    "result": {
+      "type": "object",
+      "required": ["external_id", "disposition", "artifact_locator", "artifact_content_identity"],
+      "properties": {
+        "external_id": {"type": "string", "minLength": 1, "maxLength": 512},
+        "disposition": {"enum": ["finding", "unknown"]},
+        "artifact_locator": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "artifact_content_identity": {"type": "string", "minLength": 1, "maxLength": 512},
+        "evidence": {"$ref": "#/$defs/evidence"},
+        "finding": {"$ref": "#/$defs/finding"},
+        "unknown": {"$ref": "#/$defs/unknown"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"disposition": {"const": "finding"}}},
+          "then": {"required": ["evidence", "finding"]}
+        },
+        {
+          "if": {"properties": {"disposition": {"const": "unknown"}}},
+          "then": {"required": ["evidence", "unknown"]}
+        }
+      ],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$comment": "Data-only specialist evidence interchange. The Scan importer additionally enforces snapshot/artifact identity, privacy redaction, stable result identity, and conservative coverage semantics."
+}
