@@ -12,6 +12,7 @@ from scan_core.feedback import (
     _issue_body,
     _submission_authorized,
     build_receipt,
+    flush_outbox,
     record_and_maybe_submit,
 )
 
@@ -127,6 +128,72 @@ class FeedbackReceiptTests(unittest.TestCase):
             self.assertFalse(_submission_authorized("auto"))
             self.assertTrue(_submission_authorized("github"))
             self.assertFalse(_submission_authorized("never"))
+
+
+    def test_flush_outbox_requires_existing_authorization(self):
+        receipt = build_receipt(tests=["validate=pass"], feedback=["queued for later"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            queued = record_and_maybe_submit(receipt, mode="never", root=root)
+            with patch.dict(os.environ, {}, clear=True), patch("scan_core.feedback.submit_github") as submit:
+                result = flush_outbox(mode="auto", root=root)
+            self.assertEqual(result["status"], "not_authorized")
+            self.assertEqual(result["pending"], 1)
+            self.assertTrue(Path(queued["outbox_path"]).is_file())
+            submit.assert_not_called()
+
+    def test_authorized_flush_submits_and_preserves_canonical_receipt(self):
+        receipt = build_receipt(tests=["validate=pass"], feedback=["retry this receipt"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            queued = record_and_maybe_submit(receipt, mode="never", root=root)
+            canonical = Path(queued["receipt_path"])
+            outbox = Path(queued["outbox_path"])
+            with patch.dict(os.environ, {"SCAN_FEEDBACK_SUBMIT": "1"}, clear=True), patch(
+                "scan_core.feedback.submit_github",
+                return_value={"status": "submitted", "url": "https://example.invalid/2", "repository": "legendteddy/scan"},
+            ) as submit:
+                result = flush_outbox(mode="auto", root=root)
+            submit.assert_called_once_with(receipt)
+            self.assertEqual(result["status"], "complete")
+            self.assertEqual(result["submitted"], 1)
+            self.assertEqual(result["pending"], 0)
+            self.assertFalse(outbox.exists())
+            self.assertTrue(canonical.is_file())
+
+    def test_duplicate_flush_clears_only_outbox_copy(self):
+        receipt = build_receipt(tests=["validate=pass"], issues=["same issue already exists"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            queued = record_and_maybe_submit(receipt, mode="never", root=root)
+            canonical = Path(queued["receipt_path"])
+            with patch.dict(os.environ, {"SCAN_FEEDBACK_SUBMIT": "1"}, clear=True), patch(
+                "scan_core.feedback.submit_github",
+                return_value={"status": "duplicate", "url": "https://example.invalid/existing", "repository": "legendteddy/scan"},
+            ):
+                result = flush_outbox(mode="auto", root=root)
+            self.assertEqual(result["duplicate"], 1)
+            self.assertEqual(result["pending"], 0)
+            self.assertTrue(canonical.is_file())
+
+    def test_flush_refuses_outbox_copy_that_differs_from_canonical_receipt(self):
+        receipt = build_receipt(agent="agent-a", tests=["validate=pass"])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            queued = record_and_maybe_submit(receipt, mode="never", root=root)
+            outbox = Path(queued["outbox_path"])
+            tampered = json.loads(outbox.read_text(encoding="utf-8"))
+            tampered["agent"] = "agent-b"
+            outbox.write_text(json.dumps(tampered), encoding="utf-8")
+            with patch.dict(os.environ, {"SCAN_FEEDBACK_SUBMIT": "1"}, clear=True), patch(
+                "scan_core.feedback.submit_github"
+            ) as submit:
+                result = flush_outbox(mode="auto", root=root)
+            submit.assert_not_called()
+            self.assertEqual(result["invalid"], 1)
+            self.assertEqual(result["pending"], 1)
+            self.assertTrue(outbox.is_file())
+            self.assertIn("differs from canonical", result["results"][0]["error"])
 
 
 if __name__ == "__main__":

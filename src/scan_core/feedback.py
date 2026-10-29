@@ -453,6 +453,10 @@ def flush_outbox(*, mode: str = "auto", root: Path | None = None) -> dict[str, A
     for path in batch:
         try:
             receipt = _load_queued_receipt(path)
+            canonical_path = base / "receipts" / path.name
+            canonical = _load_queued_receipt(canonical_path)
+            if canonical != receipt:
+                raise ValueError("queued feedback receipt differs from canonical local receipt")
         except (OSError, ValueError) as exc:
             invalid += 1
             results.append({
