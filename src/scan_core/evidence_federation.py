@@ -321,15 +321,20 @@ def import_evidence_bundle(
             severity = _required_text(finding.get("severity"), f"results[{index}].finding.severity", max_chars=64)
             if severity not in _ALLOWED_SEVERITIES:
                 raise ValueError(f"results[{index}].finding.severity is invalid")
+            verification_state = _required_text(
+                finding.get("verification_state"), f"results[{index}].finding.verification_state", max_chars=64
+            )
+            if verification_state != evidence_kind:
+                raise ValueError(
+                    f"results[{index}].finding.verification_state must match supporting evidence.kind"
+                )
             builder.add_finding(
                 record_id=f"finding:federation:{identity}",
                 title=_redact(_required_text(finding.get("title"), f"results[{index}].finding.title"), privacy),
                 impact=_redact(_required_text(finding.get("impact"), f"results[{index}].finding.impact"), privacy),
                 severity=severity,
                 confidence=_required_text(finding.get("confidence"), f"results[{index}].finding.confidence", max_chars=128),
-                verification_state=_required_text(
-                    finding.get("verification_state"), f"results[{index}].finding.verification_state", max_chars=64
-                ),
+                verification_state=verification_state,
                 artifact_ids=[str(artifact["id"])],
                 evidence_ids=[evidence_id],
                 uncertainty=_redact(
@@ -385,7 +390,11 @@ def import_evidence_bundle(
             "digest_verified_by_scan": False,
             "verification_note": "Scan verified the federation bundle digest, not the adapter-declared originating source payload digest.",
         },
-        "coverage": coverage,
+        "coverage": {
+            "scope": _redact(coverage["scope"], privacy),
+            "limitations": _redact(coverage["limitations"], privacy),
+            "whole_project_complete": False,
+        },
         "imported_findings": imported_findings,
         "imported_unknowns": imported_unknowns,
         "imported_evidence": imported_evidence,

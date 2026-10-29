@@ -126,6 +126,22 @@ class EvidenceFederationTests(unittest.TestCase):
         self.assertIn("did not map", unknown["reason"])
         self.assertEqual(unknown["artifact_ids"], [])
 
+    def test_finding_cannot_claim_stronger_verification_than_its_evidence(self):
+        state, artifact = self._state()
+        bundle = self._bundle(state, artifact)
+        bundle["results"][0]["finding"]["verification_state"] = "observed"
+        with self.assertRaisesRegex(ValueError, "must match supporting evidence.kind"):
+            import_evidence_bundle(state, bundle)
+
+    def test_coverage_receipt_is_privacy_redacted(self):
+        state, artifact = self._state()
+        bundle = self._bundle(state, artifact)
+        secret = "ghp_abcdefghijklmnopqrstuvwxyz123456"
+        bundle["coverage"]["scope"] = f"scanner scope token {secret}"
+        imported = import_evidence_bundle(state, bundle)
+        receipt = imported.state["extensions"]["evidence_federation_imports"][-1]
+        self.assertNotIn(secret, receipt["coverage"]["scope"])
+
     def test_whole_project_completeness_claim_is_rejected(self):
         state, artifact = self._state()
         bundle = self._bundle(state, artifact)
