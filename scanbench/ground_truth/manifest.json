@@ -11,15 +11,20 @@
     "webhook-signature-js",
     "async-cache-race-ts",
     "shell-ci-eval",
-    "go-http-body-boundary"
+    "go-http-body-boundary",
+    "rust-archive-boundary",
+    "java-http-egress",
+    "c-native-bounds",
+    "k8s-privilege-boundary",
+    "ruby-reset-token"
   ],
   "maturity_target": {
     "projects": 20,
     "conditions": 200
   },
   "milestone": {
-    "name": "corpus-m4",
-    "projects": 10,
-    "conditions": 49
+    "name": "corpus-m8",
+    "projects": 15,
+    "conditions": 99
   }
 }
