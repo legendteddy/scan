@@ -140,6 +140,24 @@ Truth-class totals are 82 `must_find`, 43 `must_not_find`, 42 `must_remain_unkno
 
 The public corpus now exceeds both numeric corpus thresholds: **26 projects against a target of 20** and **209 conditions against a target of 200**. This still does **not** establish ScanBench maturity. Genuine independent review receipts, externally custodied holdouts, and baseline effectiveness runs remain required before the P0 gate can close.
 
+## Maturity evidence audit
+
+A local maturity audit can assemble the repository-verifiable evidence without collapsing it into a single score:
+
+`python -m scan_core.scanbench2_maturity scanbench/ground_truth MATURITY.json --json`
+
+The maturity manifest can reference a review-receipts directory, an effectiveness baseline manifest, one or more revealed holdout precommitments, and one or more oracle-consistency checks. Every path is resolved relative to the maturity manifest and is confined against traversal and symlink escapes.
+
+The audit reports these gates independently:
+
+- public corpus numeric threshold;
+- independent review coverage;
+- effectiveness baseline coverage and its separate metrics;
+- holdout precommitment/reveal identity verification;
+- mutation/oracle-consistency evidence.
+
+The holdout gate is deliberately conservative: local verification can prove that revealed bytes match the supplied precommitment, but it cannot prove that custody was genuinely external or that the precommitment predates evaluation. The output therefore reports external custody as **not established by this tool** even when reveal identity verifies. Likewise, oracle consistency does not by itself prove runtime semantic equivalence. There is no blended maturity score and no automatic maturity clearance.
+
 ## Maturity target
 
 `2.0-alpha1` is the evaluation foundation, not a claim that the corpus is mature. The P0 maturity gate remains at least 20 representative projects and 200 realistic independently reviewed conditions with positive controls, negative controls, holdouts, and mutation/oracle-consistency checks.
