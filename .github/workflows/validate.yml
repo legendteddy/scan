@@ -39,11 +39,13 @@ jobs:
           "$RUNNER_TEMP/wheel-venv/bin/python" -m pip install --disable-pip-version-check "$RUNNER_TEMP"/dist/*.whl
           (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/scan" doctor "$GITHUB_WORKSPACE" --json > doctor-wheel.json)
           (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/scan-bundle" --help > scan-bundle-wheel.txt)
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/wheel-venv/bin/scan" --help > scan-help-wheel.txt)
           python -m venv "$RUNNER_TEMP/sdist-venv"
           "$RUNNER_TEMP/sdist-venv/bin/python" -m pip install --disable-pip-version-check "$RUNNER_TEMP"/dist/*.tar.gz
           (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/scan" doctor "$GITHUB_WORKSPACE" --json > doctor-sdist.json)
           (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/scan-bundle" --help > scan-bundle-sdist.txt)
-          python -c "import json,os; from pathlib import Path; r=Path(os.environ['RUNNER_TEMP']); assert json.load(open(r/'doctor-wheel.json'))['overall'] in ('pass','warn'); assert json.load(open(r/'doctor-sdist.json'))['overall'] in ('pass','warn'); assert 'create' in (r/'scan-bundle-wheel.txt').read_text(); assert 'verify' in (r/'scan-bundle-sdist.txt').read_text()"
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/sdist-venv/bin/scan" --help > scan-help-sdist.txt)
+          python -c "import json,os; from pathlib import Path; r=Path(os.environ['RUNNER_TEMP']); wh=(r/'scan-help-wheel.txt').read_text(); sd=(r/'scan-help-sdist.txt').read_text(); assert json.load(open(r/'doctor-wheel.json'))['overall'] in ('pass','warn'); assert json.load(open(r/'doctor-sdist.json'))['overall'] in ('pass','warn'); assert 'create' in (r/'scan-bundle-wheel.txt').read_text(); assert 'verify' in (r/'scan-bundle-sdist.txt').read_text(); assert all(c in wh for c in ('handoff','import-evidence','import-observed')); assert all(c in sd for c in ('handoff','import-evidence','import-observed'))"
 
       - name: Install Scan package
         run: python -m pip install --disable-pip-version-check .
@@ -170,6 +172,9 @@ jobs:
         run: |
           python -B -m unittest discover -s tests -p "test_*.py" -q
           scan-bundle --help
+          scan --help | grep -q "handoff"
+          scan --help | grep -q "import-evidence"
+          scan --help | grep -q "import-observed"
           scan bench
           scan schema --version 1.4 > /tmp/scan-schema.json
 
@@ -226,6 +231,91 @@ jobs:
           assert verified["target_executed"] is False
           assert verified["network_used"] is False
           print("INSPECTION_BUNDLE_CLI_SMOKE=PASS")
+
+      - name: Verify installed evidence-layer CLI surfaces
+        shell: python
+        run: |
+          import hashlib
+          import json
+          from pathlib import Path
+          import subprocess
+          import tempfile
+          root = Path(tempfile.mkdtemp())
+          project = root / "project"
+          project.mkdir()
+          (project / "app.py").write_text("def value():\n    return 1\n", encoding="utf-8")
+          state_path = root / "state.json"
+          subprocess.run(["scan", str(project), "--offline", "--baseline", "none", "--no-html", "--state", str(state_path), "--quiet"], check=True)
+          state = json.loads(state_path.read_text(encoding="utf-8"))
+          artifact = next(row for row in state["artifacts"] if row.get("locator") == "app.py")
+          snapshot = state["provenance"]["snapshot_digest"]
+
+          handoff_path = root / "handoff.json"
+          handoff = json.loads(subprocess.check_output(["scan", "handoff", str(state_path), "--output", str(handoff_path), "--json"], text=True))
+          assert handoff["identity"]["snapshot_digest"] == snapshot
+          assert handoff["projection"]["contains_source_bytes"] is False
+          assert handoff["projection"]["contains_raw_evidence_results"] is False
+
+          source_digest = "sha256:" + hashlib.sha256(b"installed-federation-source").hexdigest()
+          bundle = {
+              "scan_evidence_bundle_version": "1",
+              "target": {"snapshot_digest": snapshot},
+              "producer": {"kind": "external-tool", "name": "CI Specialist", "version": "1"},
+              "adapter": {"name": "ci-adapter", "version": "1"},
+              "source": {"format": "ci-json", "digest": source_digest},
+              "coverage": {"scope": "One installed-wheel federation smoke", "limitations": "Synthetic static evidence only", "whole_project_complete": False},
+              "results": [{
+                  "external_id": "CI-FED-001",
+                  "disposition": "finding",
+                  "artifact_locator": "app.py",
+                  "artifact_content_identity": artifact["content_identity"],
+                  "evidence": {"locator": "app.py:1-2", "kind": "static", "class": "static_semantic", "claim": "Synthetic installed-wheel federation finding", "result": "Bounded synthetic result", "method": "CI adapter fixture", "limitations": "Not independently reproduced"},
+                  "finding": {"title": "Synthetic federation finding", "impact": "CI-only impact", "severity": "low", "confidence": "external-tool-reported", "verification_state": "static", "uncertainty": "Synthetic CI fixture", "recommendation": "No production action", "safe_verification": "Repeat the CI smoke"},
+              }],
+          }
+          bundle_path = root / "evidence.json"
+          bundle_path.write_text(json.dumps(bundle), encoding="utf-8")
+          federated_state_path = root / "federated-state.json"
+          federated = json.loads(subprocess.check_output(["scan", "import-evidence", str(state_path), str(bundle_path), "--output", str(federated_state_path), "--json"], text=True))
+          assert federated["imported_findings"] == 1
+          assert federated["imported_evidence"] == 1
+          federated_state = json.loads(federated_state_path.read_text(encoding="utf-8"))
+          assert federated_state["coverage"]["analysis_complete"] is False
+          assert federated_state["extensions"]["evidence_federation_imports"][-1]["coverage"]["whole_project_complete"] is False
+
+          receipt = {
+              "scan_observed_receipt_version": "1",
+              "target": {"snapshot_digest": snapshot},
+              "executor": {"kind": "external-tool", "name": "CI Runtime", "version": "1"},
+              "authorization": {"basis": "CI workflow", "scope": "Synthetic receipt import only", "reference": "validate.yml"},
+              "execution": {"execution_id": "ci-observed-1", "started_at": "2026-01-01T00:00:00Z", "completed_at": "2026-01-01T00:00:01Z", "environment": "CI synthetic receipt", "target_executed": False, "network_used": False},
+              "coverage": {"scope": "One synthetic observation", "limitations": "No target execution occurred", "whole_project_complete": False},
+              "observations": [{
+                  "external_id": "CI-OBS-001",
+                  "outcome": "pass",
+                  "artifact_locator": "app.py",
+                  "artifact_content_identity": artifact["content_identity"],
+                  "locator": "app.py:1-2",
+                  "claim": "Synthetic installed-wheel observed control",
+                  "result": "Synthetic observation passed",
+                  "method": "External receipt fixture; Scan imports only",
+                  "limitations": "No runtime target execution in this smoke",
+                  "control": {"description": "Synthetic observation passed", "limitations": "Only this declared case"},
+              }],
+          }
+          receipt_path = root / "observed.json"
+          receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+          observed_state_path = root / "observed-state.json"
+          observed = json.loads(subprocess.check_output(["scan", "import-observed", str(state_path), str(receipt_path), "--output", str(observed_state_path), "--json"], text=True))
+          assert observed["imported_controls"] == 1
+          assert observed["imported_evidence"] == 1
+          observed_state = json.loads(observed_state_path.read_text(encoding="utf-8"))
+          observed_import = observed_state["extensions"]["observed_evidence_imports"][-1]
+          assert observed_import["authorization_attestation"]["verified_by_scan"] is False
+          assert observed_import["execution"]["target_executed_by_scan_during_import"] is False
+          assert observed_import["execution"]["network_used_by_scan_during_import"] is False
+          assert observed_state["coverage"]["analysis_complete"] is False
+          print("EVIDENCE_LAYER_CLI_SMOKE=PASS")
 
       - name: Verify installed SARIF import adapter
         shell: python
