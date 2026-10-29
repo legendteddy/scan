@@ -84,6 +84,30 @@ The schema is `scanbench/ground_truth/holdout-manifest-schema-v2.json`. Secret h
 
 Detection recall, negative-control specificity, unknown honesty, false-clearance violations, evidence support, artifact grounding, and reference integrity are published separately. There is no ScanBench quality score.
 
+## Baseline effectiveness ledger
+
+A baseline is a set of exact Scan states plus independently prepared adjudication submissions. The baseline runner re-evaluates every listed project against the **current** fixture truth, records the deterministic fixture digest and state digest, and aggregates raw counts across projects before calculating each metric.
+
+Create a baseline manifest such as:
+
+```json
+{
+  "scanbench2_version": "2.0-alpha1",
+  "baseline_manifest_version": "2.0-alpha1",
+  "baseline_id": "scan-static-example",
+  "inspector": {"name": "Scan", "version": "0.6.x", "configuration": "documented run configuration"},
+  "runs": [
+    {"project_id": "authorization-ownership", "state": "states/auth.json", "submission": "submissions/auth.json"}
+  ]
+}
+```
+
+State and submission paths are resolved relative to the baseline manifest and must stay within that directory tree without symlink traversal. Evaluate it with:
+
+`python -m scan_core.scanbench2_baseline scanbench/ground_truth BASELINE.json --json`
+
+The ledger reports corpus coverage, per-project fixture/state identities, pass/fail counts, detection recall, negative-control specificity, unknown honesty, false-clearance violations, evidence support, artifact grounding, and reference integrity separately. A poor baseline remains valid measurement evidence; the command does not turn weak effectiveness into a tool error. Partial baselines are clearly marked and list missing project IDs. The ledger does not establish independent oracle review or holdout custody by itself.
+
 ## Evaluation CLI
 
 `scan bench2 TRUTH.json STATE.json SUBMISSION.json --json`
