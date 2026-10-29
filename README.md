@@ -29,7 +29,7 @@ scan . --offline
 
 The second run uses the previous local `.scan/state.json` as its baseline and reports what was added, changed, removed or unchanged, while keeping fresh and reused evidence separate. `scan doctor .` is an offline, non-destructive readiness diagnostic: it checks installed package assets, target access and optional Git support, and uses a temporary local output probe that it removes before returning. It does not install, repair or contact anything.
 
-Scan 0.4.0 is published on PyPI. Install the packaged CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`. Pin `scan-skill==0.4.0` when you need that exact release.
+Scan 0.5.0 is the latest published stable release on PyPI. Install the packaged CLI with `python -m pip install scan-skill`, `pipx install scan-skill`, or `uv tool install scan-skill`. Pin `scan-skill==0.5.0` when you need that exact release. The `main` branch is the v0.6 development line and reports `0.6.0.dev0` until a release candidate is prepared.
 
 ## What makes Scan different?
 
@@ -84,7 +84,7 @@ Scan now includes a reusable composite `action.yml` for CI-native inspection. It
 ```yaml
 - uses: actions/checkout@v7
 - id: scan
-  uses: legendteddy/scan@v0.5.0 # intended release tag once v0.5 is published
+  uses: legendteddy/scan@v0.5.0
   with:
     path: .
     mode: deep
@@ -213,10 +213,10 @@ The validator verifies schema, typed references, evidence origins and coverage a
 
 Scan v0.4 adds a local, read-only MCP bridge so compatible AI hosts can use Scan Core without manually translating the CLI/state contract. The base package remains dependency-free; MCP is an optional extra.
 
-Install the published v0.4.0 MCP extra from PyPI:
+Install the published v0.5.0 MCP extra from PyPI:
 
 ```bash
-python -m pip install "scan-skill[mcp]==0.4.0"
+python -m pip install "scan-skill[mcp]==0.5.0"
 scan-mcp doctor /path/to/project
 scan-mcp /path/to/project
 ```

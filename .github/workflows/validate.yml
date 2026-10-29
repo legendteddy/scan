@@ -207,6 +207,7 @@ jobs:
 
       - name: Verify installed console entrypoint and SARIF export
         run: |
+          python -c "import importlib.metadata as m, scan_core.cli as c; from scan_core.version import __version__; assert __version__ == m.version('scan-skill'); assert {'handoff','import-evidence','import-observed'} <= c.UTILITY_COMMANDS; print('INSTALLED_SCAN_MODULE=' + c.__file__); print('INSTALLED_SCAN_VERSION=' + __version__)"
           scan --version
           scan doctor . --json
           python -c "import json,pathlib,subprocess,tempfile; d=pathlib.Path(tempfile.mkdtemp()); state=d/'state.json'; sarif=d/'scan.sarif'; subprocess.run(['scan','.', '--offline','--baseline','none','--no-html','--state',str(state),'--quiet'],check=True); subprocess.run(['scan','sarif',str(state),'--output',str(sarif)],check=True); p=json.loads(sarif.read_text(encoding='utf-8')); assert p['version']=='2.1.0' and len(p['runs'])==1 and isinstance(p['runs'][0]['results'],list); print('SARIF_CLI_SMOKE=PASS')"

@@ -22,7 +22,6 @@ DEMO = ROOT / "examples" / "demo-report.html"
 class SliceOneTests(unittest.TestCase):
     def test_canonical_package_and_runtime_versions_agree(self):
         metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-        self.assertEqual(metadata["project"]["version"], "0.4.0")
         self.assertEqual(__version__, metadata["project"]["version"])
 
     def test_scan_config_normalizes_root_to_path(self):
