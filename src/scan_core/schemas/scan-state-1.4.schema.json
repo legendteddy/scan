@@ -24,6 +24,7 @@
         "type": "object",
         "required": ["producer", "source_digest", "freshness"],
         "properties": {
+          "artifact_content_digest": {"type": ["string", "null"]},
           "freshness": {
             "type": "object",
             "required": ["status", "source_state_digest", "source_evidence_id", "original_observed_at", "reused_at", "reuse_reason"],

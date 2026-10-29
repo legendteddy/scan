@@ -377,7 +377,7 @@
       "producer": {
         "kind": "scan-core",
         "name": "scan-core",
-        "version": "0.3.1"
+        "version": "0.4.0"
       },
       "result": "{\"content_identity\":\"sha256:1a3eebf3701bf2aa4d26a487bb1fa80a41cb0884a78658930e46dd5d1a051b74\",\"excluded\":false,\"path_kind\":\"file\",\"size_bytes\":16,\"symlink_scope\":null}",
       "source_digest": "sha256:1a3eebf3701bf2aa4d26a487bb1fa80a41cb0884a78658930e46dd5d1a051b74",
@@ -385,6 +385,23 @@
     }
   ],
   "extensions": {
+    "configuration_policy": {
+      "effective": {
+        "baseline_mode": "auto",
+        "excludes": [],
+        "follow_internal_links": false,
+        "max_baseline_state_bytes": 64000000,
+        "max_file_bytes": 5000000,
+        "max_total_bytes": 250000000,
+        "privacy_mode": "offline",
+        "redaction_level": "standard",
+        "reuse_enabled": true,
+        "scan_mode": "deep",
+        "sensitive_path_pattern_count": 0
+      },
+      "precedence": "caller options > project config when enabled > built-in defaults",
+      "project_config_source": "api"
+    },
     "critical_artifact_selection": "Not determined by deterministic inventory; semantic selection is required",
     "inventory_total_hashed_bytes": 16,
     "privacy_egress_preview": {
@@ -435,7 +452,7 @@
     ]
   },
   "provenance": {
-    "configuration_digest": "sha256:ffb4f270fe65ff9679a02757e7f9504c1a10e141ab46d700358fbeea2cf50f43",
+    "configuration_digest": "sha256:dd3c282ef99ecc88c78e5384d9b55c5af48a6d436f9b30ca0237083a97325dcc",
     "git": {
       "branch": null,
       "commit": null,
@@ -452,7 +469,7 @@
       {
         "kind": "scan-core",
         "name": "scan-core",
-        "version": "0.3.1"
+        "version": "0.4.0"
       }
     ]
   },
@@ -463,7 +480,7 @@
     "network_used": false,
     "scan_id": "<volatile-run-id>",
     "scan_mode": "deep",
-    "scan_version": "0.3.1",
+    "scan_version": "0.4.0",
     "started_at": "<volatile-time>",
     "target_executed": false
   },
