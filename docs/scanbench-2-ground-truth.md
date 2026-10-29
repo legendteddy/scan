@@ -86,11 +86,11 @@ The corpus validator verifies project/fixture identity, globally unique conditio
 
 ### Current public corpus milestone
 
-The current corpus contains **20 projects / 149 conditions** across authorization, data integrity, retry/idempotency, accessibility, documentation-contract drift, test quality, JavaScript webhook verification, TypeScript async-state races, shell/CI command injection, Go HTTP resource boundaries, Rust archive extraction confinement, Java outbound HTTP/SSRF boundaries, C native memory/input bounds, Kubernetes privilege boundaries, Ruby account-recovery tokens, SQL migration safety, Kotlin offline synchronization, Terraform destruction/recovery, React checkout state/accessibility, and C# message-delivery ordering.
+The current corpus contains **26 projects / 209 conditions** across authorization, data integrity, retry/idempotency, accessibility, documentation-contract drift, test quality, JavaScript webhook verification, TypeScript async-state races, shell/CI command injection, Go HTTP resource boundaries, Rust archive extraction confinement, Java outbound HTTP/SSRF boundaries, C native memory/input bounds, Kubernetes privilege boundaries, Ruby account-recovery tokens, SQL migration safety, Kotlin offline synchronization, Terraform destruction/recovery, React checkout state/accessibility, C# message-delivery ordering, privileged GitHub Actions pull-request execution, PHP upload confinement, Swift mobile credential handling, AWS IAM least privilege, GraphQL tenant authorization, and Docker build supply-chain integrity.
 
-Truth-class totals are 58 `must_find`, 31 `must_not_find`, 30 `must_remain_unknown`, and 30 `must_not_clear` conditions.
+Truth-class totals are 82 `must_find`, 43 `must_not_find`, 42 `must_remain_unknown`, and 42 `must_not_clear` conditions.
 
-The public corpus has now reached the **20-project count target** and **74.5% of the 200-condition target**. This remains a milestone rather than a maturity claim: 51 additional realistic conditions, genuine independent review receipts, and externally custodied holdouts are still required before the P0 gate can close.
+The public corpus now exceeds both numeric corpus thresholds: **26 projects against a target of 20** and **209 conditions against a target of 200**. This still does **not** establish ScanBench maturity. Genuine independent review receipts, externally custodied holdouts, and baseline effectiveness runs remain required before the P0 gate can close.
 
 ## Maturity target
 
