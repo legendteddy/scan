@@ -86,11 +86,11 @@ The corpus validator verifies project/fixture identity, globally unique conditio
 
 ### Current public corpus milestone
 
-The current corpus contains **10 projects / 49 conditions** across authorization, data integrity, retry/idempotency, accessibility, documentation-contract drift, test quality, JavaScript webhook verification, TypeScript async-state races, shell/CI command injection, and Go HTTP resource boundaries.
+The current corpus contains **15 projects / 99 conditions** across authorization, data integrity, retry/idempotency, accessibility, documentation-contract drift, test quality, JavaScript webhook verification, TypeScript async-state races, shell/CI command injection, Go HTTP resource boundaries, Rust archive extraction confinement, Java outbound HTTP/SSRF boundaries, C native memory/input bounds, Kubernetes privilege boundaries, and Ruby account-recovery tokens.
 
-Truth-class totals are 18 `must_find`, 11 `must_not_find`, 10 `must_remain_unknown`, and 10 `must_not_clear` conditions.
+Truth-class totals are 38 `must_find`, 21 `must_not_find`, 20 `must_remain_unknown`, and 20 `must_not_clear` conditions.
 
-This remains a milestone rather than a maturity claim. The project count and condition count stay explicit so benchmark growth cannot be presented as complete before the gate is met.
+This is **75% of the project-count target** and **49.5% of the condition-count target**. It remains a milestone rather than a maturity claim: independent review receipts, externally custodied holdouts, and the remaining corpus growth are still required before the P0 gate can close.
 
 ## Maturity target
 
