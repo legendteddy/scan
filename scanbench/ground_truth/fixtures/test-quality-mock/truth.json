@@ -1,0 +1,11 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "test-quality-mock",
+  "conditions": [
+    {"id": "TEST-001", "truth": "must_find", "family": "test-quality", "description": "test_total_with_tax_happy_path mocks the function under test itself, so the assertion can pass without exercising total_with_tax implementation logic.", "rationale": "Replacing the unit under test with the expected result creates a tautological test and weakens regression detection.", "artifact_locators": ["test_pricing.py", "pricing.py"]},
+    {"id": "TEST-002", "truth": "must_find", "family": "test-coverage", "description": "The negative-subtotal ValueError path in total_with_tax has no corresponding test in the supplied test file.", "rationale": "A declared validation branch exists in implementation but is not exercised by the fixture tests.", "artifact_locators": ["pricing.py", "test_pricing.py"]},
+    {"id": "TEST-003", "truth": "must_not_find", "family": "test-quality", "description": "test_rounding_boundary_calls_real_code directly exercises total_with_tax and is a negative control against labeling every test in the file as mocked or tautological.", "rationale": "The rounding-boundary test calls the real implementation with a concrete boundary case.", "artifact_locators": ["test_pricing.py", "pricing.py"]},
+    {"id": "TEST-004", "truth": "must_remain_unknown", "family": "coverage-runtime", "description": "Repository source alone does not establish the production test suite's executed coverage percentage or whether additional external tests cover these paths.", "rationale": "Executed coverage requires a test/coverage receipt, not inference from filenames alone.", "artifact_locators": []},
+    {"id": "TEST-005", "truth": "must_not_clear", "family": "release-readiness", "description": "Test adequacy must not be cleared while TEST-001 or TEST-002 exists or executed coverage remains unknown.", "rationale": "The presence of passing-looking tests is not evidence that meaningful behavior is adequately verified.", "artifact_locators": ["test_pricing.py", "pricing.py"]}
+  ]
+}
