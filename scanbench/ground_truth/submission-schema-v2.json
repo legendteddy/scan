@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/legendteddy/scan/scanbench/submission-2.0-alpha1.schema.json",
+  "title": "ScanBench 2.0 adjudication submission",
+  "type": "object",
+  "required": ["scanbench2_version", "project_id", "state_digest", "adjudications"],
+  "properties": {
+    "scanbench2_version": {"const": "2.0-alpha1"},
+    "project_id": {"type": "string", "minLength": 1},
+    "state_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "adjudications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["condition_id", "outcome", "finding_ids", "unknown_ids", "evidence_ids"],
+        "properties": {
+          "condition_id": {"type": "string", "minLength": 1},
+          "outcome": {"enum": ["found", "not_found", "unknown", "cleared"]},
+          "finding_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "unknown_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "evidence_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "notes": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

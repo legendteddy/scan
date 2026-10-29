@@ -28,6 +28,7 @@ from .render import render_report
 from .sarif import write_sarif
 from .sarif_import import import_sarif, load_sarif_file
 from .scanbench import format_bench, run_bench
+from .scanbench2 import evaluate_ground_truth, format_ground_truth, load_ground_truth_file, load_submission_file
 from .schema import schema_text
 from .serve import create_server
 from .state import canonical_state_json
@@ -35,7 +36,7 @@ from .settings import load_project_settings
 from .validate import validate_path
 from .version import __version__
 
-UTILITY_COMMANDS = {"validate", "render", "sarif", "import-sarif", "serve", "bench", "schema", "egress", "compare", "doctor"}
+UTILITY_COMMANDS = {"validate", "render", "sarif", "import-sarif", "serve", "bench", "bench2", "schema", "egress", "compare", "doctor"}
 
 
 def _add_scan_options(parser: argparse.ArgumentParser, *, include_offline: bool) -> None:
@@ -94,6 +95,11 @@ def _utility_parser(command: str) -> argparse.ArgumentParser:
         parser.add_argument("--quiet", action="store_true")
     elif command == "bench":
         parser.add_argument("fixture", nargs="?")
+        parser.add_argument("--json", action="store_true")
+    elif command == "bench2":
+        parser.add_argument("truth_json", type=Path)
+        parser.add_argument("state_json", type=Path)
+        parser.add_argument("submission_json", type=Path)
         parser.add_argument("--json", action="store_true")
     elif command == "schema":
         parser.add_argument("--version", choices=("1.2", "1.3", "1.4"), default="1.4")
@@ -247,6 +253,19 @@ def _run_utility(command: str, argv: Sequence[str]) -> int:
             print(json.dumps(result.as_dict(), ensure_ascii=True, sort_keys=True, separators=(",", ":")))
         else:
             print(format_bench(result))
+        return int(ExitCode.OK if result.passed else ExitCode.VALIDATION_FAILED)
+    if command == "bench2":
+        for path in (args.truth_json, args.state_json, args.submission_json):
+            if not path.exists():
+                raise SourceError(f"Source path does not exist: {path}")
+        truth = load_ground_truth_file(args.truth_json)
+        state = validate_path(args.state_json)
+        submission = load_submission_file(args.submission_json)
+        result = evaluate_ground_truth(truth, state, submission)
+        if args.json:
+            print(json.dumps(result.as_dict(), ensure_ascii=True, sort_keys=True, separators=(",", ":")))
+        else:
+            print(format_ground_truth(result))
         return int(ExitCode.OK if result.passed else ExitCode.VALIDATION_FAILED)
     if command == "schema":
         text = schema_text(args.version)

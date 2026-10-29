@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/legendteddy/scan/scanbench/ground-truth-2.0-alpha1.schema.json",
+  "title": "ScanBench 2.0 ground truth",
+  "type": "object",
+  "required": ["scanbench2_version", "project_id", "conditions"],
+  "properties": {
+    "scanbench2_version": {"const": "2.0-alpha1"},
+    "project_id": {"type": "string", "minLength": 1},
+    "conditions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "truth", "family", "description", "rationale", "artifact_locators"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "truth": {"enum": ["must_find", "must_not_find", "must_remain_unknown", "must_not_clear"]},
+          "family": {"type": "string", "minLength": 1},
+          "description": {"type": "string", "minLength": 1},
+          "rationale": {"type": "string", "minLength": 1},
+          "artifact_locators": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

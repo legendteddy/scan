@@ -48,4 +48,10 @@ packages = ["scan_core", "scan_core.report", "scan_core.schemas", "scanbench_dat
   "fixtures/*/project/*",
   "fixtures/*/project/.*",
   "fixtures/*/project/*/*",
+  "ground_truth/*.json",
+  "ground_truth/*.md",
+  "ground_truth/fixtures/*/truth.json",
+  "ground_truth/fixtures/*/README.md",
+  "ground_truth/fixtures/*/project/*",
+  "ground_truth/fixtures/*/project/*/*",
 ]
