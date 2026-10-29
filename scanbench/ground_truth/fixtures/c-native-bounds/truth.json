@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "c-native-bounds",
+  "conditions": [
+    {"id":"CBUF-001","truth":"must_find","family":"buffer-overflow","description":"copy_user uses strcpy with no destination-size argument or length check.","rationale":"An oversized user string can write beyond the caller-provided buffer.","artifact_locators":["src/request.c"]},
+    {"id":"CBUF-002","truth":"must_find","family":"format-boundary","description":"build_response uses sprintf into a caller-provided buffer with no capacity bound.","rationale":"A long name can overflow the response buffer.","artifact_locators":["src/request.c"]},
+    {"id":"CBUF-003","truth":"must_find","family":"length-trust","description":"copy_payload trusts supplied_len and passes it directly to memcpy without comparing it with destination capacity.","rationale":"An attacker-controlled or incorrect length can overrun the destination.","artifact_locators":["src/request.c"]},
+    {"id":"CBUF-004","truth":"must_find","family":"numeric-parse","description":"parse_count uses atoi without error detection or range validation.","rationale":"Malformed and out-of-range input cannot be distinguished reliably from valid values and may propagate unsafe counts.","artifact_locators":["src/request.c"]},
+    {"id":"CBUF-005","truth":"must_not_find","family":"negative-control","description":"safe_copy_user uses snprintf with the destination size and rejects truncation.","rationale":"This is a bounded-copy negative control and should not be reported as the same overflow defect.","artifact_locators":["src/request.c"]},
+    {"id":"CBUF-006","truth":"must_not_find","family":"negative-control","description":"safe_copy_payload checks supplied_len against destination capacity before memcpy.","rationale":"The bounded payload-copy control should not be promoted to an overrun finding.","artifact_locators":["src/request.c"]},
+    {"id":"CBUF-007","truth":"must_remain_unknown","family":"compiler-hardening","description":"Whether production builds enable stack protectors, fortified libc, CFI, or sanitizers is not established by this source file.","rationale":"Compiler and linker hardening require build evidence not present here.","artifact_locators":["src/request.c"]},
+    {"id":"CBUF-008","truth":"must_remain_unknown","family":"caller-contract","description":"Whether every caller provides sufficiently large buffers and trusted lengths is not established by the available artifact.","rationale":"No complete call graph or runtime input contract is present.","artifact_locators":["src/request.c"]},
+    {"id":"CBUF-009","truth":"must_not_clear","family":"memory-safety","description":"The unsafe helper set must not be cleared as memory-safe for arbitrary caller input.","rationale":"Multiple writes lack capacity enforcement.","artifact_locators":["src/request.c"]},
+    {"id":"CBUF-010","truth":"must_not_clear","family":"input-validation","description":"parse_count must not be cleared as robust numeric validation.","rationale":"atoi provides no explicit malformed-input or overflow handling.","artifact_locators":["src/request.c"]}
+  ]
+}
