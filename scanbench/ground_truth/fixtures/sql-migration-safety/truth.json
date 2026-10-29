@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "sql-migration-safety",
+  "conditions": [
+    {"id":"SQLM-001","truth":"must_find","family":"destructive-migration","description":"The migration drops customers.legacy_account_number inside the committed migration.","rationale":"Dropping a populated column is irreversible without an independent backup or recovery path.","artifact_locators":["migration.sql"]},
+    {"id":"SQLM-002","truth":"must_find","family":"backfill-ordering","description":"orders.external_reference is made NOT NULL without any backfill or validation step in the migration.","rationale":"Existing NULL rows can make the migration fail or force an unsafe deployment sequence.","artifact_locators":["migration.sql"]},
+    {"id":"SQLM-003","truth":"must_find","family":"contract-compatibility","description":"invoices.total_cents is renamed directly to amount_cents without a compatibility period in this migration.","rationale":"Deployments with old and new application versions can disagree on the column contract during rollout.","artifact_locators":["migration.sql"]},
+    {"id":"SQLM-004","truth":"must_find","family":"locking-risk","description":"idx_orders_customer_id is created with a normal CREATE INDEX inside the transaction rather than concurrently.","rationale":"On PostgreSQL this form can take stronger locks than the explicitly concurrent index later in the same migration.","artifact_locators":["migration.sql"]},
+    {"id":"SQLM-005","truth":"must_not_find","family":"negative-control","description":"idx_invoices_created_at explicitly uses CREATE INDEX CONCURRENTLY.","rationale":"The migration contains this reduced-locking index form and it must not be reported as a normal CREATE INDEX.","artifact_locators":["migration.sql"]},
+    {"id":"SQLM-006","truth":"must_not_find","family":"negative-control","description":"The migration is explicitly wrapped by BEGIN and COMMIT.","rationale":"Transaction markers are present and should not be falsely reported as absent.","artifact_locators":["migration.sql"]},
+    {"id":"SQLM-007","truth":"must_remain_unknown","family":"production-data-shape","description":"Whether any existing orders.external_reference rows are NULL is not established by the migration file.","rationale":"Production row contents require database evidence outside the fixture.","artifact_locators":["migration.sql"]},
+    {"id":"SQLM-008","truth":"must_remain_unknown","family":"rollback-recovery","description":"Whether a tested backup or point-in-time recovery path exists is not established by this migration.","rationale":"Recovery readiness depends on external operational evidence.","artifact_locators":["migration.sql"]},
+    {"id":"SQLM-009","truth":"must_not_clear","family":"migration-readiness","description":"The migration must not be cleared as zero-downtime safe from this artifact alone.","rationale":"It combines a direct rename, a new NOT NULL constraint, and a non-concurrent index operation.","artifact_locators":["migration.sql"]},
+    {"id":"SQLM-010","truth":"must_not_clear","family":"data-recovery","description":"The migration must not be cleared as safely reversible.","rationale":"A column is dropped while backup/recovery evidence remains unknown.","artifact_locators":["migration.sql"]}
+  ]
+}
