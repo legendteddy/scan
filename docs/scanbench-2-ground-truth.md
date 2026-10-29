@@ -13,6 +13,19 @@ ScanBench v1 remains the frozen honesty/integrity benchmark. ScanBench 2.0 adds 
 
 The evaluator does not keyword-match finding titles. An external reviewer or benchmark adapter prepares an adjudication that maps each independently reviewed condition to canonical finding, unknown, and evidence IDs. The adjudication is bound to `state_digest`, so it cannot silently be reused against a different Scan state.
 
+## Independent ground-truth review receipts
+
+Corpus membership does not imply that a fixture has received independent review. A separate review receipt can approve a fixture only when it:
+
+- names an independent reviewer and review role;
+- covers every current condition ID exactly;
+- is bound to a deterministic SHA-256 digest of `truth.json` plus all fixture project files;
+- declares `independent_of_fixture_author=true` for an approval.
+
+Any project-file or truth-file mutation invalidates the receipt. This gives oracle review a freshness boundary rather than allowing an old approval to survive changed fixture semantics. The receipt schema is `scanbench/ground_truth/review-receipt-schema-v2.json`.
+
+The repository deliberately does not fabricate approval receipts for its own fixtures. Independent review remains an external evidence requirement for the maturity gate.
+
 ## Metrics
 
 Detection recall, negative-control specificity, unknown honesty, false-clearance violations, evidence support, and reference integrity are published separately. There is no ScanBench quality score.
