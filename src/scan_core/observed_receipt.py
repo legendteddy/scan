@@ -336,7 +336,7 @@ def import_observed_receipt(
                 ),
                 artifact_ids=[str(artifact["id"])],
                 evidence_ids=[evidence_id],
-                effectiveness_status="observed_pass",
+                effectiveness_status="observed_effective",
                 limitations=limitations + " Passing this observation does not establish behavior outside its declared scope.",
             )
             imported_controls += 1

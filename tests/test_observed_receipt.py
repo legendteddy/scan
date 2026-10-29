@@ -111,7 +111,7 @@ class ObservedReceiptTests(unittest.TestCase):
         self.assertEqual(imported.imported_controls, 1)
         self.assertEqual(imported.imported_findings, 0)
         control = next(row for row in imported.state["controls"] if row["id"].startswith("control:observed:"))
-        self.assertEqual(control["effectiveness_status"], "observed_pass")
+        self.assertEqual(control["effectiveness_status"], "observed_effective")
         self.assertIn("does not establish behavior outside", control["limitations"])
         self.assertFalse(imported.state["coverage"]["analysis_complete"])
 
