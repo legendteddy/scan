@@ -1,0 +1,11 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "async-cache-race-ts",
+  "conditions": [
+    {"id": "RACE-001", "truth": "must_find", "family": "async-state", "description": "An older, slower search response can overwrite latestResults after a newer query has already completed because responses are not associated with a request generation.", "rationale": "Concurrent calls assign shared latestResults in completion order rather than query order.", "artifact_locators": ["search.ts"]},
+    {"id": "RACE-002", "truth": "must_find", "family": "state-consistency", "description": "latestQuery is updated before the request completes while latestResults is updated later, so currentSearch can expose a new query paired with stale results.", "rationale": "The two shared state fields are not advanced atomically or bound to the same completed request.", "artifact_locators": ["search.ts"]},
+    {"id": "RACE-003", "truth": "must_not_find", "family": "url-encoding", "description": "The query is encoded through URLSearchParams; this is a negative control against reporting raw query-string concatenation.", "rationale": "URLSearchParams performs the relevant URL encoding in the supplied code.", "artifact_locators": ["search.ts"]},
+    {"id": "RACE-004", "truth": "must_remain_unknown", "family": "ui-runtime", "description": "Whether callers debounce requests, cancel older searches, or ignore stale results cannot be established from this module alone.", "rationale": "Caller behavior is outside the supplied fixture.", "artifact_locators": []},
+    {"id": "RACE-005", "truth": "must_not_clear", "family": "state-readiness", "description": "Search-state consistency must not be cleared while request ordering is unsafe or caller-side cancellation remains unverified.", "rationale": "Successful HTTP responses do not establish coherent shared state under concurrency.", "artifact_locators": ["search.ts"]}
+  ]
+}

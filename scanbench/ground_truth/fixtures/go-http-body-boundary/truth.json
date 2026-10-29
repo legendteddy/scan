@@ -1,0 +1,11 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "go-http-body-boundary",
+  "conditions": [
+    {"id": "GOHTTP-001", "truth": "must_find", "family": "resource-lifecycle", "description": "Fetch never closes resp.Body, including successful responses, preventing normal connection/resource cleanup.", "rationale": "The supplied function has no defer resp.Body.Close or equivalent close path after client.Do succeeds.", "artifact_locators": ["client.go"]},
+    {"id": "GOHTTP-002", "truth": "must_find", "family": "resource-bounds", "description": "Fetch reads the response body with io.ReadAll without applying a response-size limit.", "rationale": "A sufficiently large remote response can drive unbounded memory consumption in this function.", "artifact_locators": ["client.go"]},
+    {"id": "GOHTTP-003", "truth": "must_not_find", "family": "cancellation", "description": "The request is constructed with http.NewRequestWithContext using the caller context; this is a negative control against claiming context cancellation is discarded.", "rationale": "Context propagation is explicit in the supplied code.", "artifact_locators": ["client.go"]},
+    {"id": "GOHTTP-004", "truth": "must_remain_unknown", "family": "remote-runtime", "description": "Whether the remote service or a transport/proxy enforces a sufficiently small response size cannot be established from this fixture.", "rationale": "Remote and deployment limits are external operational facts.", "artifact_locators": []},
+    {"id": "GOHTTP-005", "truth": "must_not_clear", "family": "client-readiness", "description": "HTTP client resource safety must not be cleared while response bodies are not closed, reads are unbounded, or external response limits remain unverified.", "rationale": "Context propagation alone does not establish bounded resource behavior.", "artifact_locators": ["client.go"]}
+  ]
+}

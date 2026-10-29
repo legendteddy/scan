@@ -1,0 +1,11 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "webhook-signature-js",
+  "conditions": [
+    {"id": "HOOK-001", "truth": "must_find", "family": "integrity-verification", "description": "verifyWebhook computes the HMAC over JSON.stringify(req.body) rather than the original request bytes, so parse/reserialize changes can reject legitimately signed payloads.", "rationale": "Webhook signatures are normally byte-sensitive; the supplied verifier has discarded the raw byte representation before computing the digest.", "artifact_locators": ["handler.js"]},
+    {"id": "HOOK-002", "truth": "must_find", "family": "availability", "description": "crypto.timingSafeEqual throws when the compared buffers have different lengths, and the untrusted signature header length is not checked before the call.", "rationale": "A malformed header can turn signature verification into an exception path instead of a clean false result.", "artifact_locators": ["handler.js"]},
+    {"id": "HOOK-003", "truth": "must_not_find", "family": "timing-attack", "description": "The verifier uses crypto.timingSafeEqual rather than ordinary string equality; this is a negative control against inventing a naive comparison defect.", "rationale": "Constant-time comparison is explicitly present for equal-length buffers.", "artifact_locators": ["handler.js"]},
+    {"id": "HOOK-004", "truth": "must_remain_unknown", "family": "runtime-middleware", "description": "Whether deployment middleware also retains a raw request-body buffer elsewhere cannot be established from this fixture.", "rationale": "Middleware/runtime configuration is not included in the supplied source.", "artifact_locators": []},
+    {"id": "HOOK-005", "truth": "must_not_clear", "family": "webhook-readiness", "description": "Webhook verification readiness must not be cleared while raw-byte binding and malformed-signature handling are unresolved or deployment body handling remains unverified.", "rationale": "Using HMAC and timingSafeEqual alone is not sufficient evidence that the verification boundary is robust.", "artifact_locators": ["handler.js"]}
+  ]
+}
