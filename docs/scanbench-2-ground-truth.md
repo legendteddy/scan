@@ -86,11 +86,11 @@ The corpus validator verifies project/fixture identity, globally unique conditio
 
 ### Current public corpus milestone
 
-The current corpus contains **15 projects / 99 conditions** across authorization, data integrity, retry/idempotency, accessibility, documentation-contract drift, test quality, JavaScript webhook verification, TypeScript async-state races, shell/CI command injection, Go HTTP resource boundaries, Rust archive extraction confinement, Java outbound HTTP/SSRF boundaries, C native memory/input bounds, Kubernetes privilege boundaries, and Ruby account-recovery tokens.
+The current corpus contains **20 projects / 149 conditions** across authorization, data integrity, retry/idempotency, accessibility, documentation-contract drift, test quality, JavaScript webhook verification, TypeScript async-state races, shell/CI command injection, Go HTTP resource boundaries, Rust archive extraction confinement, Java outbound HTTP/SSRF boundaries, C native memory/input bounds, Kubernetes privilege boundaries, Ruby account-recovery tokens, SQL migration safety, Kotlin offline synchronization, Terraform destruction/recovery, React checkout state/accessibility, and C# message-delivery ordering.
 
-Truth-class totals are 38 `must_find`, 21 `must_not_find`, 20 `must_remain_unknown`, and 20 `must_not_clear` conditions.
+Truth-class totals are 58 `must_find`, 31 `must_not_find`, 30 `must_remain_unknown`, and 30 `must_not_clear` conditions.
 
-This is **75% of the project-count target** and **49.5% of the condition-count target**. It remains a milestone rather than a maturity claim: independent review receipts, externally custodied holdouts, and the remaining corpus growth are still required before the P0 gate can close.
+The public corpus has now reached the **20-project count target** and **74.5% of the 200-condition target**. This remains a milestone rather than a maturity claim: 51 additional realistic conditions, genuine independent review receipts, and externally custodied holdouts are still required before the P0 gate can close.
 
 ## Maturity target
 

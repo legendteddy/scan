@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "terraform-destruction",
+  "conditions": [
+    {"id":"TFD-001","truth":"must_find","family":"destructive-storage","description":"The archive bucket explicitly sets force_destroy = true.","rationale":"Terraform may delete non-empty bucket contents during resource destruction instead of blocking the destroy.","artifact_locators":["main.tf"]},
+    {"id":"TFD-002","truth":"must_find","family":"database-deletion","description":"The primary database explicitly disables deletion protection.","rationale":"The configuration removes an infrastructure-level guard against accidental database deletion.","artifact_locators":["main.tf"]},
+    {"id":"TFD-003","truth":"must_find","family":"database-recovery","description":"The database sets skip_final_snapshot = true.","rationale":"A destroy operation can remove the database without creating a final snapshot through this resource configuration.","artifact_locators":["main.tf"]},
+    {"id":"TFD-004","truth":"must_find","family":"backup-retention","description":"The database backup_retention_period is explicitly zero.","rationale":"Automated backup retention is disabled for this resource configuration.","artifact_locators":["main.tf"]},
+    {"id":"TFD-005","truth":"must_not_find","family":"negative-control","description":"S3 bucket versioning is explicitly enabled.","rationale":"Versioning is present and must not be falsely reported as disabled.","artifact_locators":["main.tf"]},
+    {"id":"TFD-006","truth":"must_not_find","family":"negative-control","description":"DynamoDB point-in-time recovery is explicitly enabled.","rationale":"This recovery control is present and must not be reported as absent.","artifact_locators":["main.tf"]},
+    {"id":"TFD-007","truth":"must_remain_unknown","family":"state-policy","description":"Whether CI or Terraform Cloud policy blocks destructive plans is not established by this configuration.","rationale":"Plan approval and policy-as-code controls require external workflow evidence.","artifact_locators":["main.tf"]},
+    {"id":"TFD-008","truth":"must_remain_unknown","family":"external-backups","description":"Whether independent database or bucket backups exist outside these Terraform resources is not established.","rationale":"External backup systems are outside the provided configuration.","artifact_locators":["main.tf"]},
+    {"id":"TFD-009","truth":"must_not_clear","family":"destruction-safety","description":"The infrastructure must not be cleared as strongly protected against accidental destructive changes.","rationale":"force_destroy is enabled and database deletion protection is disabled.","artifact_locators":["main.tf"]},
+    {"id":"TFD-010","truth":"must_not_clear","family":"recovery-readiness","description":"The database must not be cleared as having established destruction recovery.","rationale":"Final snapshots and automated retention are disabled while external backup evidence remains unknown.","artifact_locators":["main.tf"]}
+  ]
+}

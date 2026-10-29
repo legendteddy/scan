@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "react-checkout-state",
+  "conditions": [
+    {"id":"REACT-001","truth":"must_find","family":"async-state-race","description":"Quote responses update total without request-version, cancellation, or quantity matching.","rationale":"A slower response for an older quantity can overwrite the total for a newer quantity.","artifact_locators":["Checkout.tsx"]},
+    {"id":"REACT-002","truth":"must_find","family":"keyboard-accessibility","description":"The Place order control is a div with onClick and has no native button semantics or keyboard handler.","rationale":"Keyboard-only users do not receive the native activation behavior of a button.","artifact_locators":["Checkout.tsx"]},
+    {"id":"REACT-003","truth":"must_find","family":"form-labeling","description":"The quantity input has no associated label, aria-label, or aria-labelledby attribute.","rationale":"Its accessible name is not established by this component.","artifact_locators":["Checkout.tsx"]},
+    {"id":"REACT-004","truth":"must_find","family":"duplicate-submission","description":"submit has no in-flight guard and the Place order control remains activatable during the request.","rationale":"Repeated activation can call placeOrder multiple times before the first request resolves.","artifact_locators":["Checkout.tsx"]},
+    {"id":"REACT-005","truth":"must_not_find","family":"negative-control","description":"Status text is exposed through role=status with aria-live=polite.","rationale":"A live-region status control is explicitly present and must not be reported as absent.","artifact_locators":["Checkout.tsx"]},
+    {"id":"REACT-006","truth":"must_not_find","family":"negative-control","description":"The quantity increment action uses a native button with type=button.","rationale":"This control has native button semantics and should not be conflated with the div-based Place order control.","artifact_locators":["Checkout.tsx"]},
+    {"id":"REACT-007","truth":"must_remain_unknown","family":"server-idempotency","description":"Whether placeOrder is idempotent or deduplicates repeated requests is not established by this client component.","rationale":"Server-side order semantics require external API evidence.","artifact_locators":["Checkout.tsx"]},
+    {"id":"REACT-008","truth":"must_remain_unknown","family":"assistive-technology-runtime","description":"Observed behavior across browsers and assistive technologies is not established by static component source.","rationale":"Runtime accessibility behavior requires executed browser/AT evidence.","artifact_locators":["Checkout.tsx"]},
+    {"id":"REACT-009","truth":"must_not_clear","family":"checkout-accessibility","description":"The checkout must not be cleared as keyboard-accessible and correctly labeled.","rationale":"The primary order action lacks button keyboard semantics and the quantity input lacks an accessible name.","artifact_locators":["Checkout.tsx"]},
+    {"id":"REACT-010","truth":"must_not_clear","family":"order-correctness","description":"The checkout must not be cleared as protected against stale totals and duplicate order submission.","rationale":"Quote responses can race and submit lacks an in-flight guard while server idempotency remains unknown.","artifact_locators":["Checkout.tsx"]}
+  ]
+}

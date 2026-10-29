@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "csharp-message-delivery",
+  "conditions": [
+    {"id":"MSG-001","truth":"must_find","family":"ack-ordering","description":"The broker message is acknowledged before charging or saving account state.","rationale":"A failure after Ack can lose work because the broker has already been told the message completed.","artifact_locators":["PaymentWorker.cs"]},
+    {"id":"MSG-002","truth":"must_find","family":"idempotency","description":"payments.Charge receives account and amount but no message/idempotency key from this worker.","rationale":"Retry calls Handle again, so an uncertain failure can repeat an externally visible charge unless an external provider control exists.","artifact_locators":["PaymentWorker.cs"]},
+    {"id":"MSG-003","truth":"must_find","family":"event-ordering","description":"ReportedBalance and LastSequence are assigned without checking that message.Sequence is newer than the stored sequence.","rationale":"A late older event can overwrite state established by a newer event.","artifact_locators":["PaymentWorker.cs"]},
+    {"id":"MSG-004","truth":"must_find","family":"cross-system-atomicity","description":"The external charge occurs before account persistence with no compensation path in this worker.","rationale":"If account save fails after a successful charge, external payment state and local account state can diverge.","artifact_locators":["PaymentWorker.cs"]},
+    {"id":"MSG-005","truth":"must_not_find","family":"negative-control","description":"PaymentMessage carries an explicit MessageId.","rationale":"A stable message identifier exists and should not be reported as entirely absent from the event contract.","artifact_locators":["PaymentWorker.cs"]},
+    {"id":"MSG-006","truth":"must_not_find","family":"negative-control","description":"The worker records the message ID in its audit entry after processing.","rationale":"A correlation value is explicitly included in the audit event.","artifact_locators":["PaymentWorker.cs"]},
+    {"id":"MSG-007","truth":"must_remain_unknown","family":"broker-semantics","description":"The broker's exact acknowledgement and redelivery guarantees are not established by this worker source.","rationale":"Broker implementation/configuration is external evidence.","artifact_locators":["PaymentWorker.cs"]},
+    {"id":"MSG-008","truth":"must_remain_unknown","family":"payment-provider-deduplication","description":"Whether Payments.Charge independently deduplicates repeated charges is not established here.","rationale":"Provider implementation and request semantics are outside the fixture.","artifact_locators":["PaymentWorker.cs"]},
+    {"id":"MSG-009","truth":"must_not_clear","family":"delivery-safety","description":"The worker must not be cleared as safe under retries and partial failures.","rationale":"Acknowledgement happens first, charging lacks a visible idempotency key, and cross-system compensation is absent.","artifact_locators":["PaymentWorker.cs"]},
+    {"id":"MSG-010","truth":"must_not_clear","family":"ordered-state","description":"The worker must not be cleared as preserving monotonic event order.","rationale":"Sequence is stored but never compared before reported balance overwrites current account state.","artifact_locators":["PaymentWorker.cs"]}
+  ]
+}

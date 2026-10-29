@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "kotlin-offline-sync",
+  "conditions": [
+    {"id":"SYNC-001","truth":"must_find","family":"delivery-ordering","description":"Pending items are marked synced before their upload call succeeds.","rationale":"A network failure after markSynced can make an unsent item disappear from the pending set.","artifact_locators":["SyncManager.kt"]},
+    {"id":"SYNC-002","truth":"must_find","family":"idempotency","description":"Uploads contain no client-generated idempotency key or operation identifier in this client code.","rationale":"RetryScheduler can repeat an upload after an uncertain failure, so duplicate server-side effects are possible unless an external server control exists.","artifact_locators":["SyncManager.kt"]},
+    {"id":"SYNC-003","truth":"must_find","family":"data-loss","description":"An empty remote response causes dao.deleteAll().","rationale":"A transient or incomplete empty response is treated as authoritative deletion of all local items.","artifact_locators":["SyncManager.kt"]},
+    {"id":"SYNC-004","truth":"must_find","family":"conflict-resolution","description":"Conflict resolution chooses the record with the greater updatedAt timestamp.","rationale":"Clock-based last-write-wins can discard valid edits when device/server clocks or write ordering diverge.","artifact_locators":["SyncManager.kt"]},
+    {"id":"SYNC-005","truth":"must_not_find","family":"negative-control","description":"Network upload and download calls use a 15-second timeout wrapper.","rationale":"Timeout bounds are explicitly present and must not be reported as absent.","artifact_locators":["SyncManager.kt"]},
+    {"id":"SYNC-006","truth":"must_not_find","family":"negative-control","description":"Remote application is marked transactional with @Transaction.","rationale":"A transaction boundary is explicitly declared for applying a remote batch.","artifact_locators":["SyncManager.kt"]},
+    {"id":"SYNC-007","truth":"must_remain_unknown","family":"server-deduplication","description":"Whether the server deduplicates repeated uploads is not established by this client fixture.","rationale":"Server implementation and persistence semantics are outside the provided artifact.","artifact_locators":["SyncManager.kt"]},
+    {"id":"SYNC-008","truth":"must_remain_unknown","family":"clock-quality","description":"Whether participating clocks are synchronized closely enough for timestamp conflict resolution is not established.","rationale":"Clock synchronization is runtime/device evidence not contained in this source file.","artifact_locators":["SyncManager.kt"]},
+    {"id":"SYNC-009","truth":"must_not_clear","family":"offline-data-integrity","description":"The client must not be cleared as lossless under offline/network failure conditions.","rationale":"Items can be marked synced before upload and an empty remote list can delete all local data.","artifact_locators":["SyncManager.kt"]},
+    {"id":"SYNC-010","truth":"must_not_clear","family":"exactly-once-delivery","description":"The sync flow must not be cleared as exactly-once delivery.","rationale":"Retries exist while client-side idempotency is absent and server-side deduplication remains unknown.","artifact_locators":["SyncManager.kt"]}
+  ]
+}
