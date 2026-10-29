@@ -1,0 +1,11 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "data-loss-transaction",
+  "conditions": [
+    {"id": "DATA-001", "truth": "must_find", "family": "data-integrity", "description": "replace_preferences deletes the current preferences before the replacement insert without an enclosing transaction, so an insert failure can permanently lose prior data.", "rationale": "The destructive write is committed independently from the replacement write in the shown code path.", "artifact_locators": ["service.py"]},
+    {"id": "DATA-002", "truth": "must_find", "family": "error-handling", "description": "An insert exception is converted into an ok=true response even though the replacement failed.", "rationale": "Returning success hides a failed write and can cause callers to stop retrying or auditing the loss.", "artifact_locators": ["service.py"]},
+    {"id": "DATA-003", "truth": "must_not_find", "family": "injection", "description": "The SQL statements shown use positional parameters for user-controlled values and are a negative SQL-injection control.", "rationale": "The presence of SQL text alone is not evidence of injection when values are parameterized.", "artifact_locators": ["service.py"]},
+    {"id": "DATA-004", "truth": "must_remain_unknown", "family": "recovery-runtime", "description": "Whether production backups or point-in-time recovery can restore lost preferences cannot be established from this repository fixture.", "rationale": "Backup configuration and restore evidence are operational facts outside the supplied source.", "artifact_locators": []},
+    {"id": "DATA-005", "truth": "must_not_clear", "family": "release-readiness", "description": "Data-integrity readiness must not be cleared while DATA-001 or DATA-002 remains unresolved or recovery capability is unverified.", "rationale": "A successful static scan of unrelated paths cannot establish safe destructive-write behavior.", "artifact_locators": ["service.py"]}
+  ]
+}
