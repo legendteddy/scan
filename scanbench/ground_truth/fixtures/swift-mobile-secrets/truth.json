@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "swift-mobile-secrets",
+  "conditions": [
+    {"id":"IOS-001","truth":"must_find","family":"credential-storage","description":"The access token is stored in UserDefaults.","rationale":"UserDefaults is not the platform credential store and does not provide Keychain-style protection for bearer credentials.","artifact_locators":["AuthStore.swift"]},
+    {"id":"IOS-002","truth":"must_find","family":"credential-logging","description":"The access token is written to NSLog.","rationale":"Bearer credentials can persist in diagnostic logs and become visible outside the intended authentication flow.","artifact_locators":["AuthStore.swift"]},
+    {"id":"IOS-003","truth":"must_find","family":"clipboard-exposure","description":"The refresh token is copied into the general UIPasteboard.","rationale":"Clipboard contents can be exposed through user actions and platform clipboard-sharing behavior beyond the credential store.","artifact_locators":["AuthStore.swift"]},
+    {"id":"IOS-004","truth":"must_find","family":"credential-rotation","description":"SecItemAdd return status is ignored and there is no update path for an existing refresh-token item.","rationale":"A duplicate-item result can leave an older refresh token stored while the caller assumes the new credential was saved.","artifact_locators":["AuthStore.swift"]},
+    {"id":"IOS-005","truth":"must_not_find","family":"negative-control","description":"Profile requests use an HTTPS URL.","rationale":"The fixture does not send the bearer token over an explicit plaintext HTTP URL.","artifact_locators":["AuthStore.swift"]},
+    {"id":"IOS-006","truth":"must_not_find","family":"negative-control","description":"The Keychain item uses kSecAttrAccessibleWhenUnlockedThisDeviceOnly.","rationale":"A device-only, when-unlocked accessibility class is present and should not be reported as absent.","artifact_locators":["AuthStore.swift"]},
+    {"id":"IOS-007","truth":"must_remain_unknown","family":"logging-policy","description":"Whether production log collection redacts or excludes this NSLog output is not established by the source file.","rationale":"Runtime logging and collection policy require deployment evidence.","artifact_locators":["AuthStore.swift"]},
+    {"id":"IOS-008","truth":"must_remain_unknown","family":"keychain-access","description":"The effective Keychain access group and entitlement sharing policy are not established here.","rationale":"Entitlements and signing configuration are external to this source file.","artifact_locators":["AuthStore.swift"]},
+    {"id":"IOS-009","truth":"must_not_clear","family":"credential-confidentiality","description":"The client must not be cleared as keeping authentication credentials confined to protected credential storage.","rationale":"The access token is in UserDefaults and logs, while the refresh token is copied to the general pasteboard.","artifact_locators":["AuthStore.swift"]},
+    {"id":"IOS-010","truth":"must_not_clear","family":"credential-rotation","description":"The refresh-token persistence path must not be cleared as reliably rotating credentials.","rationale":"Duplicate Keychain items are not updated and the SecItemAdd result is ignored.","artifact_locators":["AuthStore.swift"]}
+  ]
+}

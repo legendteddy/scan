@@ -1,0 +1,16 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "github-actions-pr-target",
+  "conditions": [
+    {"id":"GHA-001","truth":"must_find","family":"untrusted-trigger","description":"The workflow uses pull_request_target for pull-request code review.","rationale":"pull_request_target executes in the base repository security context, so untrusted head code must not be executed under that context.","artifact_locators":["review.yml"]},
+    {"id":"GHA-002","truth":"must_find","family":"untrusted-checkout","description":"The workflow explicitly checks out github.event.pull_request.head.sha.","rationale":"This places attacker-controlled pull-request bytes in a workflow running with base-repository privileges.","artifact_locators":["review.yml"]},
+    {"id":"GHA-003","truth":"must_find","family":"workflow-permissions","description":"The job grants contents: write and pull-requests: write while processing the untrusted head checkout.","rationale":"Compromised pull-request code can act with write-capable repository permissions.","artifact_locators":["review.yml"]},
+    {"id":"GHA-004","truth":"must_find","family":"package-hooks","description":"npm ci is run after checking out the untrusted pull-request head.","rationale":"npm installation can execute lifecycle scripts defined by attacker-controlled package metadata.","artifact_locators":["review.yml"]},
+    {"id":"GHA-005","truth":"must_not_find","family":"negative-control","description":"The workflow explicitly disables OIDC token minting with id-token: none.","rationale":"An inspector should not falsely claim that this workflow grants OIDC token permission.","artifact_locators":["review.yml"]},
+    {"id":"GHA-006","truth":"must_not_find","family":"negative-control","description":"The workflow grants only actions: read rather than actions: write.","rationale":"The existing read-only Actions permission must not be reported as write permission.","artifact_locators":["review.yml"]},
+    {"id":"GHA-007","truth":"must_remain_unknown","family":"repository-secrets","description":"Whether repository or organization secrets are configured and accessible to this workflow is not established by the workflow file.","rationale":"Secret inventory and policy are external repository settings.","artifact_locators":["review.yml"]},
+    {"id":"GHA-008","truth":"must_remain_unknown","family":"repository-policy","description":"Whether branch protection or organization policy prevents consequential writes from this token is not established here.","rationale":"Repository and organization enforcement require external evidence.","artifact_locators":["review.yml"]},
+    {"id":"GHA-009","truth":"must_not_clear","family":"fork-pr-safety","description":"The workflow must not be cleared as safe for executing arbitrary fork pull-request code.","rationale":"It checks out and runs the pull-request head in a pull_request_target job with write permissions.","artifact_locators":["review.yml"]},
+    {"id":"GHA-010","truth":"must_not_clear","family":"least-privilege","description":"The workflow must not be cleared as least-privileged for untrusted review execution.","rationale":"Repository write scopes are present while untrusted code and package hooks are executed.","artifact_locators":["review.yml"]}
+  ]
+}
