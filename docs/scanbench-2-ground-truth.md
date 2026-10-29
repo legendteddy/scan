@@ -26,6 +26,30 @@ Any project-file or truth-file mutation invalidates the receipt. This gives orac
 
 The repository deliberately does not fabricate approval receipts for its own fixtures. Independent review remains an external evidence requirement for the maturity gate.
 
+## External holdout precommitments
+
+A real holdout should not be checked into the public repository before evaluation. Instead, a custodian can publish or otherwise timestamp a small precommitment manifest containing only:
+
+- a holdout set ID and custodian identity;
+- each secret fixture's project ID;
+- the deterministic fixture SHA-256 digest;
+- total condition count;
+- counts for the four truth classes.
+
+The manifest deliberately omits source, descriptions, truth details, artifact paths, and condition IDs. This keeps the fixture hidden while committing the custodian to exact bytes and coarse oracle shape before an inspector is evaluated.
+
+Validate a precommitment:
+
+`python -m scan_core.scanbench2_holdout validate HOLDOUT.json --json`
+
+After the fixture is revealed, verify it against the earlier commitment:
+
+`python -m scan_core.scanbench2_holdout verify HOLDOUT.json PROJECT_ID REVEALED_FIXTURE_ROOT --json`
+
+Verification recomputes the same fixture digest used by independent review receipts and checks project identity plus condition/truth-class counts. A changed source file, changed truth file, or rewritten oracle therefore fails verification. Precommitment verification proves fixture identity; it does **not** prove reviewer independence or inspector effectiveness.
+
+The schema is `scanbench/ground_truth/holdout-manifest-schema-v2.json`. Secret holdout fixtures should remain outside this repository until reveal.
+
 ## Metrics
 
 Detection recall, negative-control specificity, unknown honesty, false-clearance violations, evidence support, and reference integrity are published separately. There is no ScanBench quality score.
