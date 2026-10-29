@@ -89,6 +89,8 @@ def run() -> int:
         "--output", str(report_path),
         "--quiet",
     ]
+    if not _bool_input("project-config", False):
+        args.append("--ignore-project-config")
     for pattern in _lines(_input("excludes")):
         args.extend(["--exclude", pattern])
     for pattern in _lines(_input("sensitive-paths")):

@@ -158,6 +158,51 @@ class BuilderApiTests(unittest.TestCase):
                 uncertainty="Known", recommendation="Fix ref", safe_verification="Validate",
             )
 
+    def test_builder_binds_semantic_evidence_to_artifact_identity_and_locator(self):
+        temporary, state = self._base()
+        self.addCleanup(temporary.cleanup)
+        artifact = state["artifacts"][0]
+        builder = SemanticStateBuilder.from_state(state)
+
+        with self.assertRaisesRegex(BuilderError, "locator does not belong"):
+            builder.add_evidence(
+                artifact_id=artifact["id"], locator="other.py:1", kind="static",
+                claim="Bad locator", result="Bad", method="semantic read", limitations="Static only",
+                source_digest=artifact["content_identity"], producer_kind="human",
+                producer_name="test-reviewer", producer_version="1",
+            )
+        with self.assertRaisesRegex(BuilderError, "source_digest.*must match"):
+            builder.add_evidence(
+                artifact_id=artifact["id"], locator=artifact["locator"], kind="static",
+                claim="Bad digest", result="Bad", method="semantic read", limitations="Static only",
+                source_digest="sha256:" + "0" * 64, producer_kind="human",
+                producer_name="test-reviewer", producer_version="1",
+            )
+
+        evidence_id = builder.add_evidence(
+            artifact_id=artifact["id"], locator=artifact["locator"] + ":1", kind="static",
+            claim="Bound evidence", result="answer assignment reviewed", method="semantic read",
+            limitations="Static only", source_digest=artifact["content_identity"],
+            producer_kind="human", producer_name="test-reviewer", producer_version="1",
+            evidence_class="static_semantic",
+        )
+        built = builder.build()
+        evidence = next(row for row in built["evidence"] if row["id"] == evidence_id)
+        self.assertEqual(evidence["artifact_content_digest"], artifact["content_identity"])
+        validate_state(built)
+
+        broken = json.loads(json.dumps(built))
+        target = next(row for row in broken["evidence"] if row["id"] == evidence_id)
+        target["artifact_content_digest"] = "sha256:" + "f" * 64
+        with self.assertRaisesRegex(ValueError, "artifact_content_digest must match"):
+            validate_state(broken)
+
+        broken = json.loads(json.dumps(built))
+        target = next(row for row in broken["evidence"] if row["id"] == evidence_id)
+        target["locator"] = "other.py:1"
+        with self.assertRaisesRegex(ValueError, "locator does not belong"):
+            validate_state(broken)
+
     def test_builder_rejects_common_agent_shape_and_omission_mistakes(self):
         temporary, state = self._base()
         self.addCleanup(temporary.cleanup)

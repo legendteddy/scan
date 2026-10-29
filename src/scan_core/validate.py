@@ -550,6 +550,31 @@ def _validate_state_1_4(state):
     compatibility['schema_version'] = '1.3'
     _validate_state_1_3(compatibility)
 
+    artifact_rows = {artifact['id']: artifact for artifact in state['artifacts']}
+    binding = state.get('extensions', {}).get('evidence_binding')
+    binding_v1 = isinstance(binding, dict) and binding.get('version') == '1'
+
+    def locator_matches_artifact(locator, artifact_locator):
+        return locator == artifact_locator or any(
+            locator.startswith(artifact_locator + separator) for separator in (':', '#', '@')
+        )
+
+    for evidence in state['evidence']:
+        label = evidence['id'] + ': '
+        artifact = artifact_rows[evidence['artifact_id']]
+        artifact_digest = evidence.get('artifact_content_digest')
+        if artifact_digest is not None:
+            _sha256(artifact_digest, label + 'artifact_content_digest')
+            if isinstance(artifact.get('content_identity'), str) and artifact['content_identity'].startswith('sha256:'):
+                require(artifact_digest == artifact['content_identity'],
+                        label + 'artifact_content_digest must match referenced artifact content_identity')
+        if binding_v1:
+            require(locator_matches_artifact(evidence['locator'], artifact['locator']),
+                    label + 'evidence locator does not belong to referenced artifact')
+            if evidence.get('evidence_class') in {'static_semantic', 'static_architecture', 'static_content'} and                     isinstance(artifact.get('content_identity'), str) and artifact['content_identity'].startswith('sha256:'):
+                require(artifact_digest == artifact['content_identity'],
+                        label + 'semantic evidence requires artifact_content_digest bound to referenced artifact')
+
     baseline = state.get('baseline')
     require(isinstance(baseline, dict), 'baseline must be an object')
     baseline_keys = (
