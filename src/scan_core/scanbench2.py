@@ -30,6 +30,7 @@ class ConditionEvaluation:
     passed: bool
     reference_valid: bool
     evidence_supported: bool | None
+    artifact_grounded: bool | None
     detail: str
 
     def as_dict(self) -> dict[str, Any]:
@@ -41,6 +42,7 @@ class ConditionEvaluation:
             "passed": self.passed,
             "reference_valid": self.reference_valid,
             "evidence_supported": self.evidence_supported,
+            "artifact_grounded": self.artifact_grounded,
             "detail": self.detail,
         }
 
@@ -192,6 +194,7 @@ def evaluate_ground_truth(ground_truth: Mapping[str, Any], state: Mapping[str, A
         condition_ids=condition_ids,
     )
     by_condition = {row["condition_id"]: row for row in judged["adjudications"]}
+    artifacts = {row["id"]: row for row in canonical_state["artifacts"]}
     findings = {row["id"]: row for row in canonical_state["findings"]}
     unknowns = {row["id"]: row for row in canonical_state["unknowns"]}
     evidence = {row["id"]: row for row in canonical_state["evidence"]}
@@ -208,19 +211,47 @@ def evaluate_ground_truth(ground_truth: Mapping[str, Any], state: Mapping[str, A
             and all(ref in evidence for ref in evidence_ids)
         )
         support_ok: bool | None = None
+        artifact_grounded: bool | None = None
         if adjudication["outcome"] == "found":
             support_ok = bool(finding_ids) and refs_valid
+            linked: set[str] = set()
             if support_ok:
                 linked = {eid for fid in finding_ids for eid in findings[fid].get("evidence_ids", [])}
                 support_ok = bool(linked) and (not evidence_ids or bool(linked.intersection(evidence_ids)))
+            required_locators = set(condition["artifact_locators"])
+            if required_locators:
+                referenced_artifact_ids = {
+                    artifact_id
+                    for fid in finding_ids
+                    if fid in findings
+                    for artifact_id in findings[fid].get("artifact_ids", [])
+                }
+                referenced_evidence_ids = linked.union(evidence_ids)
+                referenced_artifact_ids.update(
+                    evidence[eid].get("artifact_id")
+                    for eid in referenced_evidence_ids
+                    if eid in evidence and evidence[eid].get("artifact_id")
+                )
+                referenced_locators = {
+                    artifacts[artifact_id].get("locator")
+                    for artifact_id in referenced_artifact_ids
+                    if artifact_id in artifacts
+                }
+                artifact_grounded = required_locators.issubset(referenced_locators)
         elif adjudication["outcome"] == "unknown":
             support_ok = bool(unknown_ids) and refs_valid
 
         truth_kind = condition["truth"]
         outcome = adjudication["outcome"]
+        grounding_ok = artifact_grounded is not False
         if truth_kind == "must_find":
-            passed = outcome == "found" and support_ok is True
-            detail = "required finding was evidence-backed" if passed else "required finding was not established with valid evidence"
+            passed = outcome == "found" and support_ok is True and grounding_ok
+            if passed:
+                detail = "required finding was evidence-backed and grounded in required artifacts"
+            elif outcome == "found" and support_ok is True and artifact_grounded is False:
+                detail = "required finding was evidence-backed but did not cover the ground-truth artifacts"
+            else:
+                detail = "required finding was not established with valid evidence"
         elif truth_kind == "must_not_find":
             passed = outcome == "not_found" and not finding_ids and refs_valid
             detail = "negative control was not reported as a finding" if passed else "negative control was incorrectly reported or adjudicated"
@@ -229,12 +260,12 @@ def evaluate_ground_truth(ground_truth: Mapping[str, Any], state: Mapping[str, A
             detail = "insufficient evidence remained an explicit unknown" if passed else "unknown-only condition was overclaimed or not represented"
         else:
             if outcome == "found":
-                passed = support_ok is True
+                passed = support_ok is True and grounding_ok
             elif outcome == "unknown":
                 passed = support_ok is True
             else:
                 passed = False
-            detail = "condition was not falsely cleared" if passed else "condition was cleared or omitted without sufficient basis"
+            detail = "condition was not falsely cleared" if passed else "condition was cleared, ungrounded, or omitted without sufficient basis"
         rows.append(ConditionEvaluation(
             condition_id=condition["id"],
             truth=truth_kind,
@@ -243,6 +274,7 @@ def evaluate_ground_truth(ground_truth: Mapping[str, Any], state: Mapping[str, A
             passed=passed,
             reference_valid=refs_valid,
             evidence_supported=support_ok,
+            artifact_grounded=artifact_grounded,
             detail=detail,
         ))
 
@@ -258,6 +290,8 @@ def evaluate_ground_truth(ground_truth: Mapping[str, Any], state: Mapping[str, A
     false_clearances = sum(not row.passed for row in no_clear)
     found_rows = [row for row in rows if row.outcome == "found"]
     supported_found = sum(row.evidence_supported is True for row in found_rows)
+    grounding_rows = [row for row in found_rows if row.artifact_grounded is not None]
+    grounded_found = sum(row.artifact_grounded is True for row in grounding_rows)
     metrics = {
         "detection": {"true_positive": tp, "false_negative": fn, "recall": _ratio(tp, len(must_find))},
         "negative_controls": {"true_negative": tn, "false_positive": fp, "specificity": _ratio(tn, len(negatives))},
@@ -271,6 +305,11 @@ def evaluate_ground_truth(ground_truth: Mapping[str, Any], state: Mapping[str, A
             "supported_found_outcomes": supported_found,
             "found_outcomes": len(found_rows),
             "rate": _ratio(supported_found, len(found_rows)),
+        },
+        "artifact_grounding": {
+            "grounded": grounded_found,
+            "required": len(grounding_rows),
+            "rate": _ratio(grounded_found, len(grounding_rows)),
         },
         "reference_integrity": {
             "valid": sum(row.reference_valid for row in rows),
@@ -305,6 +344,7 @@ def format_ground_truth(result: GroundTruthResult) -> str:
         f"Unknown-honesty rate: {result.metrics['unknown_honesty']['rate']}",
         f"False-clearance violations: {result.metrics['false_clearance']['violations']}",
         f"Evidence-support rate: {result.metrics['evidence_support']['rate']}",
+        f"Artifact-grounding rate: {result.metrics['artifact_grounding']['rate']}",
         "No blended overall quality score is calculated.",
     ])
     return "\n".join(lines)
