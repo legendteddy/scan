@@ -57,7 +57,7 @@ jobs:
       - name: Compile package, tests, validator and demo generator
         run: |
           python -m compileall -q src/scan_core tests
-          python -m py_compile scripts/validate_report.py scripts/test_validate_report.py scripts/build_demo_report.py
+          python -m py_compile scripts/validate_report.py scripts/test_validate_report.py scripts/build_demo_report.py scripts/v06_acceptance.py
 
       - name: Run frozen Scan 1.2 validator contract tests
         run: python -B -m unittest discover -s scripts -p "test_*.py" -v
@@ -440,6 +440,6 @@ jobs:
         if: ${{ !cancelled() && steps.install-wheel.outcome == 'success' }}
         run: scan bench
 
-      - name: Run installed v0.3 acceptance matrix
+      - name: Run installed v0.6 acceptance matrix
         if: ${{ !cancelled() && steps.install-wheel.outcome == 'success' }}
-        run: python scripts/v03_acceptance.py
+        run: python scripts/v06_acceptance.py
