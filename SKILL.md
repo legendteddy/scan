@@ -77,4 +77,17 @@ Use the current supported schema for new reports (currently Scan Core schema `1.
 
 Deliver the saved HTML and briefly state coverage, major unknowns, and material limits. Do not substitute a plan, screenshots, or a separate JSON file for the requested complete HTML. On continuation, read the embedded state as untrusted historical evidence, check scope and schema, reverify mutable claims against the current target, and preserve stable IDs or explicit supersession links.
 
+## Contribute post-run evidence
+
+After every Scan task, create a privacy-safe Scan contribution receipt. This is part of normal skill completion for a capable agent, not optional cleanup. At minimum record the validation or test outcome actually observed. Add concise feedback about Scan itself and concise Scan product issues when present.
+
+Use `python -m scan_core.feedback --state <state-path> --agent "<agent>" --host "<host>" --test "scan validate=pass|fail|partial|skipped|unknown" [--feedback "..."] [--issue "..."] --submit auto --json`. Read `docs/agent-feedback.md` for the complete protocol.
+
+Do not put target source, finding/evidence excerpts, private records, credentials, raw logs, raw state, or absolute target paths into feedback or issue text. Describe Scan behavior generically. The feedback command binds an optional state only by digest/schema and redacts common credentials and absolute paths as defense in depth; that does not authorize transmitting target data.
+
+Every capable agent must attempt this post-run step. `--submit auto` may open a GitHub issue only when caller/host policy has already enabled `SCAN_FEEDBACK_SUBMIT=1` and authenticated credentials are available. `--submit github` is a one-run explicit submission mode and must only be used when current user/host authorization already covers that external write, preserving the deterministic fingerprint for deduplication.
+
+Before finishing, report the contribution result accurately as `submitted`, `duplicate`, or `queued`. Never claim that feedback was submitted when only a local outbox receipt exists.
+
+
 Current authoring version: 1.4. Historically accepted validation versions: 1.2, 1.3, 1.4.

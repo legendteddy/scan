@@ -34,7 +34,7 @@ _SECRET_PATTERNS = (
     re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{12,}\b"),
     re.compile(r"(?i)\b(token|secret|password|api[_-]?key)\s*[:=]\s*[^\s,;]+"),
 )
-_WINDOWS_PATH = re.compile(r"(?i)(?:[A-Z]:\\(?:[^\s\\/:*?\"<>|]+\\)+[^\s\\/:*?\"<>|]*)")
+_WINDOWS_PATH = re.compile(r"(?i)(?:[A-Z]:\\+(?:[^\s\\/:*?\"<>|]+\\+)+[^\s\\/:*?\"<>|]*)")
 _POSIX_PATH = re.compile(r"(?<![A-Za-z0-9._-])/(?:[^\s/]+/)+[^\s/]+")
 
 
