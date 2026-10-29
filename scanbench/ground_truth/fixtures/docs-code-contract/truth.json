@@ -1,0 +1,11 @@
+{
+  "scanbench2_version": "2.0-alpha1",
+  "project_id": "docs-code-contract",
+  "conditions": [
+    {"id": "DOC-001", "truth": "must_find", "family": "documentation-contract", "description": "The README documents /api/v1/users/:id while getUser calls /api/v2/users/:id.", "rationale": "The documentation and implementation disagree on an externally relevant endpoint path.", "artifact_locators": ["README.md", "api.ts"]},
+    {"id": "DOC-002", "truth": "must_find", "family": "documentation-contract", "description": "The README says an empty id returns null without throwing, but getUser throws Error('id is required').", "rationale": "The documented failure contract directly contradicts the implementation.", "artifact_locators": ["README.md", "api.ts"]},
+    {"id": "DOC-003", "truth": "must_not_find", "family": "documentation-contract", "description": "The README description of normalizeEmail matches its implementation and is a negative control for documentation drift.", "rationale": "The trim-and-lowercase behavior is consistent across documentation and code.", "artifact_locators": ["README.md", "api.ts"]},
+    {"id": "DOC-004", "truth": "must_remain_unknown", "family": "consumer-runtime", "description": "Whether deployed consumers currently depend on the documented v1 endpoint or null-return behavior cannot be established from this fixture.", "rationale": "Consumer usage and deployment state require evidence outside the supplied repository files.", "artifact_locators": []},
+    {"id": "DOC-005", "truth": "must_not_clear", "family": "release-readiness", "description": "Public contract readiness must not be cleared while DOC-001 or DOC-002 is unresolved or consumer impact is unknown.", "rationale": "Internal type correctness does not resolve externally documented behavior mismatches.", "artifact_locators": ["README.md", "api.ts"]}
+  ]
+}
